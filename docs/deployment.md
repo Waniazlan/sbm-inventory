@@ -45,3 +45,18 @@ Point an isolated copy of the app at the restored database, run `php artisan inv
 ## Docker PostgreSQL for ongoing development
 
 `docker compose up -d` starts only PostgreSQL with a persistent named volume on host port 55441, avoiding the temporary test cluster. Set `INVENTORY_DB_PASSWORD` in the root ignored `.env` before starting. Update backend DB values to database/user `sbm_inventory`, port `55441`, and that password. Create a separate test database and configure `.env.testing` if using this server for tests. Never remove the volume unless intentionally deleting all development data.
+
+## inventory.vgadget.my — native Caddy + PHP 8.4-FPM
+
+The matching Sales deployment installer is `scripts/install-production.sh`. It uses `/var/www/sbm-inventory`, a separate FPM socket, and an additional Caddy site without replacing Main or Sales. Production selects `DO_DB_*` credentials with SSL; local/testing retains `DB_*`. The installer creates the dedicated `sbm-inventory` database and schema before migrations and seeds only categories. It preserves APP_KEY and storage, keeps the project `.env` as the protected source, and installs a minute timer for `inventory:reconcile`. Inventory posts synchronously and needs no queue worker.
+
+```bash
+cd /home/system/sbm-inventory
+composer install --working-dir=backend --no-dev --no-interaction --optimize-autoloader
+(cd frontend && npm ci && npm run build)
+sudo bash scripts/install-production.sh
+cd /var/www/sbm-inventory/backend
+sudo -u www-data php artisan sbm:create-admin YOUR_EMAIL
+```
+
+Set DNS for inventory.vgadget.my to this server and use Cloudflare Full (strict). Verify `https://inventory.vgadget.my/up` and login after deployment. Back up the dedicated database and protected environment. Sales integration still requires the adapter changes described in integration-contracts.md.

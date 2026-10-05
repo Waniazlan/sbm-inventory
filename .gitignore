@@ -10,3 +10,7 @@
 **/playwright-report/
 **/.review-credentials.json
 .DS_Store
+
+# Protected deployment environment backups
+**/.env.backup.*
+**/.env.next

@@ -17,7 +17,9 @@ return [
     |
     */
 
-    'default' => env('DB_CONNECTION', 'sqlite'),
+    'default' => env('APP_ENV', 'production') === 'production'
+        ? 'digitalocean'
+        : env('DB_CONNECTION', 'sqlite'),
 
     /*
     |--------------------------------------------------------------------------
@@ -95,9 +97,24 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            'search_path' => env('DB_SEARCH_PATH', 'public'),
             'timezone' => 'UTC',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        'digitalocean' => [
+            'driver' => 'pgsql',
+            'host' => env('DO_DB_HOST'),
+            'port' => env('DO_DB_PORT', '25060'),
+            'database' => env('DO_DB_DATABASE'),
+            'username' => env('DO_DB_USERNAME'),
+            'password' => env('DO_DB_PASSWORD'),
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('DB_SEARCH_PATH', 'public'),
+            'timezone' => 'UTC',
+            'sslmode' => env('DO_DB_SSLMODE', 'require'),
         ],
 
         'sqlsrv' => [
