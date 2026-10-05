@@ -1,0 +1,17 @@
+# Adapt domain, certificate paths, install directory and PHP-FPM socket.
+server {
+    listen 443 ssl;
+    server_name inventory.example.com;
+    ssl_certificate /etc/ssl/inventory/fullchain.pem;
+    ssl_certificate_key /etc/ssl/inventory/privkey.pem;
+    root /srv/sbm-inventory/frontend/dist;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+    location ~ ^/(api|sanctum)(/|$)|^/up$ {
+        include fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /srv/sbm-inventory/backend/public/index.php;
+        fastcgi_param DOCUMENT_ROOT /srv/sbm-inventory/backend/public;
+        fastcgi_pass unix:/run/php/php8.4-fpm.sock;
+    }
+    location ~ /\. { deny all; }
+}

@@ -1,0 +1,12 @@
+**/.env
+**/.env.testing
+**/vendor/
+**/node_modules/
+**/dist/
+**/storage/**/*.log
+**/bootstrap/cache/*.php
+**/storage/framework/
+**/test-results/
+**/playwright-report/
+**/.review-credentials.json
+.DS_Store
