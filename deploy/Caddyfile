@@ -1,0 +1,25 @@
+inventory.vgadget.my {
+	encode zstd gzip
+	header X-Content-Type-Options nosniff
+	header X-Frame-Options SAMEORIGIN
+	header Referrer-Policy strict-origin-when-cross-origin
+
+	@hidden path_regexp hidden (^|/)\.
+	respond @hidden 404
+	request_body {
+		max_size 6MB
+	}
+
+	@backend path /api /api/* /sanctum /sanctum/* /up
+	handle @backend {
+		root * /var/www/sbm-inventory/backend/public
+		rewrite * /index.php
+		php_fastcgi unix//run/php/sbm-inventory.sock
+	}
+
+	handle {
+		root * /var/www/sbm-inventory/frontend/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

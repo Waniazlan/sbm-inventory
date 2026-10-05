@@ -98,3 +98,7 @@ npm test
 Browser tests require both servers, installed Chrome (override `SBM_CHROME_PATH`), and the ignored local review credentials. Create these only on a local development database with `php scripts/create-review-user.php` from the project root. Browser tests create development ledger entries; they never erase history.
 
 See [verification evidence](docs/verification.md) and [deployment / backup instructions](docs/deployment.md).
+
+## Native production setup
+
+Deployment files for `inventory.vgadget.my` are prepared under `deploy/` and `scripts/install-production.sh`. See [deployment instructions](docs/deployment.md). Dependencies and frontend build are installed; activation requires running the installer with sudo.

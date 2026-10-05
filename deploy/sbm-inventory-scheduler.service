@@ -1,0 +1,13 @@
+[Unit]
+Description=SBM Inventory Laravel scheduler
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/sbm-inventory/backend
+ExecStart=/usr/bin/php artisan inventory:reconcile
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
