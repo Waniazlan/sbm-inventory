@@ -1,9 +1,10 @@
 import { useState } from "react";
 
-import { Plus, Search } from "lucide-react";
+import { Camera, Plus, Search } from "lucide-react";
 import { money, type Item, type Page } from "../api";
 
 import { ItemForm } from "../components/ItemForm";
+import { BarcodeScanner } from "../components/BarcodeScanner";
 import {
   Button,
   Empty,
@@ -17,6 +18,8 @@ import { StockForm } from "../components/StockForm";
 import { useApp, useLoad } from "../hooks";
 export function Catalogue({ low = false }: { low?: boolean }) {
   const { user, meta } = useApp();
+  const [scanning, setScanning] = useState(false);
+  const [scannedBarcode, setScannedBarcode] = useState("");
   const [search, setSearch] = useState(""),
     [status, setStatus] = useState(low ? "low" : ""),
     [category, setCategory] = useState(""),
@@ -25,7 +28,9 @@ export function Catalogue({ low = false }: { low?: boolean }) {
     [stock, setStock] = useState<{ kind: string; item: Item } | null>(null),
     [detail, setDetail] = useState<Item | null>(null);
   const q = useLoad<Page<Item>>(
-    `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&page=${page}`,
+    scannedBarcode
+      ? `/items?barcode=${encodeURIComponent(scannedBarcode)}&page=${page}`
+      : `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&page=${page}`,
   );
   return (
     <>
@@ -37,12 +42,17 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             : "Your spare parts and accessories, organised by compatibility."
         }
         actions={
-          user.role === "admin" && (
-            <Button onClick={() => setEdit("new")}>
-              <Plus size={17} />
-              Add item
+          <>
+            <Button variant="secondary" onClick={() => setScanning(true)}>
+              <Camera size={17} /> Scan barcode
             </Button>
-          )
+            {user.role === "admin" && (
+              <Button onClick={() => setEdit("new")}>
+                <Plus size={17} />
+                Add item
+              </Button>
+            )}
+          </>
         }
       />
       <section className="panel">
@@ -51,10 +61,11 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             <Search size={18} />
             <input
               aria-label="Search catalogue"
-              placeholder="Search name, SKU, brand, model or supplier…"
+              placeholder="Search barcode, name, SKU, brand, model or supplier…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
+                setScannedBarcode("");
                 setPage(1);
               }}
             />
@@ -64,6 +75,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             value={category}
             onChange={(e) => {
               setCategory(e.target.value);
+              setScannedBarcode("");
               setPage(1);
             }}
           >
@@ -80,6 +92,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value);
+                setScannedBarcode("");
                 setPage(1);
               }}
             >
@@ -91,6 +104,24 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             </select>
           )}
         </div>
+        {scannedBarcode && (
+          <div className="barcode-lookup" role="status">
+            <span>
+              Exact barcode: <strong>{scannedBarcode}</strong> · Searching all
+              items
+            </span>
+            <Button
+              variant="quiet"
+              onClick={() => {
+                setScannedBarcode("");
+                setSearch("");
+                setPage(1);
+              }}
+            >
+              Clear scan
+            </Button>
+          </div>
+        )}
         <Status {...q} retry={q.reload}>
           {q.data?.data.length ? (
             <div className="table-scroll">
@@ -117,6 +148,9 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                           {i.name}
                         </button>
                         <small>{i.sku}</small>
+                        <small className="barcode-number">
+                          Barcode: {i.barcode || "Not assigned"}
+                        </small>
                       </td>
                       <td>
                         {i.phone_models.length
@@ -173,17 +207,37 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             </div>
           ) : (
             <Empty
-              title={search ? "No matching items" : "No items to display"}
+              title={
+                scannedBarcode
+                  ? "Barcode not assigned"
+                  : search
+                    ? "No matching items"
+                    : "No items to display"
+              }
               text={
-                low
-                  ? "Items will appear when they reach the configured minimum."
-                  : "Add an item, map compatible models, then record its first receipt."
+                scannedBarcode
+                  ? `No item has barcode ${scannedBarcode}. ${user.role === "admin" ? "Add an item or edit an existing item to assign it." : "Ask an administrator to assign it to an item."}`
+                  : low
+                    ? "Items will appear when they reach the configured minimum."
+                    : "Add an item, map compatible models, then record its first receipt."
               }
             />
           )}
           <Pager page={q.data} setPage={setPage} />
         </Status>
       </section>
+      {scanning && (
+        <BarcodeScanner
+          lookup
+          close={() => setScanning(false)}
+          onConfirm={(value) => {
+            setScannedBarcode(value);
+            setSearch(value);
+            setPage(1);
+            setScanning(false);
+          }}
+        />
+      )}
       {edit && (
         <ItemForm
           item={edit === "new" ? undefined : edit}
@@ -203,6 +257,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
           <div className="detail-grid">
             {Object.entries({
               Status: detail.active ? "Active" : "Inactive",
+              Barcode: detail.barcode || "Not assigned",
               Stock: `${detail.stock} ${detail.unit}(s)`,
               Brand: detail.brand,
               Part: detail.part_number,

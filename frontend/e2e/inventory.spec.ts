@@ -21,9 +21,11 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await page.getByRole("link", { name: "Item catalogue" }).click();
   await page.getByRole("button", { name: "Add item" }).click();
   const sku = "BROWSER-" + Date.now();
+  const barcode = String(Date.now()).padStart(16, "0");
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Item name").fill("Browser verification battery");
   await dialog.getByLabel("SKU", { exact: true }).fill(sku);
+  await dialog.getByLabel("Item barcode (16 digits)").fill(barcode);
   await dialog
     .getByLabel("Component category")
     .selectOption({ label: "Battery" });

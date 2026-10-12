@@ -157,7 +157,7 @@ class InventoryTest extends TestCase
     public function test_catalogue_compatibility_search_and_cannot_overwrite_stock()
     {
         $phone = PhoneModel::create(['brand' => 'Apple', 'name' => 'iPhone 13']);
-        $d = ['sku' => 'LCD-13', 'name' => 'Display', 'category_id' => $this->item->category_id, 'unit' => 'piece', 'cost' => 1000, 'price' => 2000, 'minimum_stock' => 3, 'active' => true, 'phone_model_ids' => [$phone->id], 'stock' => 999];
+        $d = ['barcode' => '0012345678901234', 'sku' => 'LCD-13', 'name' => 'Display', 'category_id' => $this->item->category_id, 'unit' => 'piece', 'cost' => 1000, 'price' => 2000, 'minimum_stock' => 3, 'active' => true, 'phone_model_ids' => [$phone->id], 'stock' => 999];
         $id = $this->postJson('/api/v1/items', $d)->assertCreated()->json('id');
         $this->assertDatabaseHas('items', ['id' => $id, 'stock' => 0]);
         $this->getJson('/api/v1/items?search=iPhone')->assertJsonCount(1, 'data');

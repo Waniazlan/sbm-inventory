@@ -30,6 +30,7 @@ export type Phone = Named & { brand: string };
 export type Item = {
   id: number;
   sku: string;
+  barcode: string | null;
   name: string;
   category_id: number;
   supplier_id: number | null;

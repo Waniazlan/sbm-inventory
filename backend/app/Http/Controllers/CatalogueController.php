@@ -9,20 +9,25 @@ use App\Models\RepairJob;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Audit;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CatalogueController
 {
     public static function query(Request $r)
     {
-        $r->validate(['search' => 'nullable|string|max:200', 'category_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer']);
+        $r->validate(['search' => 'nullable|string|max:200', 'barcode' => ['nullable', 'string', 'regex:/\A[0-9]{16}\z/'], 'category_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer']);
         $q = Item::with(['category', 'supplier', 'phoneModels']);
+        if ($r->filled('barcode')) {
+            $q->where('barcode', $r->query('barcode'));
+        }
         if ($s = $r->query('search')) {
             $q->where(function ($q) use ($s) {
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $s).'%';
-                foreach (['sku', 'name', 'brand', 'part_number'] as $c) {
+                foreach (['sku', 'barcode', 'name', 'brand', 'part_number'] as $c) {
                     $q->orWhere($c, 'ilike', $like);
                 }$q->orWhereHas('phoneModels', fn ($q) => $q->where('brand', 'ilike', $like)->orWhere('name', 'ilike', $like))->orWhereHas('supplier', fn ($q) => $q->where('name', 'ilike', $like));
             });
@@ -74,22 +79,44 @@ class CatalogueController
 
     public function save(Request $r, ?Item $item = null)
     {
+        $barcode = $r->validate([
+            'barcode' => [
+                $item ? 'sometimes' : 'required',
+                $item && ! $item->barcode ? 'nullable' : 'required',
+                'string',
+                'regex:/\A[0-9]{16}\z/',
+                Rule::unique('items', 'barcode')->ignore($item?->id),
+            ],
+        ], [
+            'barcode.regex' => 'The barcode must contain exactly 16 digits.',
+            'barcode.unique' => 'This barcode is already assigned to another item.',
+        ]);
         $d = $r->validate(['sku' => ['required', 'string', 'max:100', Rule::unique('items')->ignore($item?->id)], 'name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'required|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);
 
-        return DB::transaction(function () use ($d, $item) {
-            $ids = $d['phone_model_ids'];
-            unset($d['phone_model_ids']);
-            $item = $item?->exists ? Item::whereKey($item->id)->lockForUpdate()->firstOrFail() : null;
-            $before = $item?->load('phoneModels')->toArray();
-            if ($item) {
-                $item->update($d);
-            } else {
-                $item = Item::create($d);
-            }$item->phoneModels()->sync($ids);
-            Audit::record($before ? 'item.updated' : 'item.created', (string) $item->id, ['before' => $before, 'after' => $d, 'phone_model_ids' => $ids]);
+        $d = array_merge($d, $barcode);
 
-            return $item->load(['category', 'supplier', 'phoneModels']);
-        });
+        try {
+            return DB::transaction(function () use ($d, $item) {
+                $ids = $d['phone_model_ids'];
+                unset($d['phone_model_ids']);
+                $item = $item?->exists ? Item::whereKey($item->id)->lockForUpdate()->firstOrFail() : null;
+                $before = $item?->load('phoneModels')->toArray();
+                if ($item) {
+                    $item->update($d);
+                } else {
+                    $item = Item::create($d);
+                }$item->phoneModels()->sync($ids);
+                Audit::record($before ? 'item.updated' : 'item.created', (string) $item->id, ['before' => $before, 'after' => $d, 'phone_model_ids' => $ids]);
+
+                return $item->load(['category', 'supplier', 'phoneModels']);
+            });
+        } catch (UniqueConstraintViolationException $e) {
+            // A second save can claim the same barcode after request validation.
+            if (str_contains($e->getMessage(), 'items_barcode_unique')) {
+                throw ValidationException::withMessages(['barcode' => 'This barcode is already assigned to another item.']);
+            }
+            throw $e;
+        }
     }
 
     public function metadata(Request $r)

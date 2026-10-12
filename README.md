@@ -7,16 +7,16 @@ Inventory Management for the SBM phone repair shop suite. Laravel 12 / PHP 8.4, 
 - Frontend: **http://127.0.0.1:5175**
 - API: **http://127.0.0.1:8018**
 - Initial local administrator: see the ignored `backend/.review-credentials.json` file. This account has a randomly generated password; no fixed production credentials are shipped.
-- Database: isolated PostgreSQL cluster at port `55440`, databases `sbm_inventory` and `sbm_inventory_test`.
+- Database: local Homebrew PostgreSQL at port `5432`, with separate databases `sbm_inventory` and `sbm_inventory_test`. Set `DB_PORT=5432` in `backend/.env` for this setup; the included Docker setup uses `55441`.
 
-The locally created cluster lives at `/private/tmp/sbm-inventory-pg`. This is temporary development storage: use a persistent PostgreSQL installation or the included Docker volume for ongoing work. Local development PostgreSQL 14 was available and tested; the supplied Docker configuration uses PostgreSQL 16.
+Use persistent PostgreSQL storage for ongoing work. The original development cluster at `/private/tmp/sbm-inventory-pg` on port `55440` used temporary storage and may disappear when temporary files are cleared. The current local setup uses Homebrew PostgreSQL 14 storage at `/opt/homebrew/var/postgresql@14`; the supplied Docker configuration uses PostgreSQL 16 with a persistent volume.
 
 ## Workflows
 
 | Screen | Features |
 | --- | --- |
 | Overview | Live stock counts, standard-cost value, low-stock attention list, recent movements |
-| Item catalogue | Unique SKU, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
+| Item catalogue | Unique SKU and 16-digit barcode, camera/photo capture and barcode lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
 | Receive stock | Quantity, supplier/reference, actual unit cost, optional batch and serial notes |
 | Movement ledger | Receipts, issues, counts, sales, repair usage, returns and linked reversals; search, date/type/user filters |
 | Repair parts | Administrator assigns external repair references; technicians consume parts only on their active assignments |
@@ -28,6 +28,19 @@ The locally created cluster lives at `/private/tmp/sbm-inventory-pg`. This is te
 Start by adding phone models and suppliers in Settings. Create items with compatibility mappings, then record receipts for opening stock. To issue or count a specific item, click its name in the catalogue and choose **Issue or adjust stock**. A technician can use **Repair parts → Record usage** after an administrator assigns a repair reference.
 
 No business sample stock is seeded. Browser checks create explicitly named verification items and immutable history; successful runs reverse their receipts and deactivate those items.
+
+## Barcode flow (first implementation)
+
+1. Open **Item catalogue → Add item** (or **Edit** an existing item).
+2. Select **Scan barcode**, allow camera access, frame the entire barcode, and tap **Snap barcode**.
+3. Review the detected 16 digits and select **Use barcode**. Complete the item details and **Save item**.
+4. To find it later, select **Scan barcode** at the top of the catalogue, capture the label, then **Find item**. Scans search all items, including inactive items, regardless of category or stock filters.
+
+The barcode belongs to a catalogue item (all stock of that item), not to each individual physical unit. New items require a unique 16-digit barcode; existing items can be assigned one when available. Leading zeroes are retained, duplicates are rejected, and assigned barcodes cannot be cleared. A scan only fills the form; saving the item commits it.
+
+Camera access requires HTTPS or localhost. **Choose barcode photo** and manual entry are available if camera access is unavailable. Photos are decoded locally using ZXing and are never uploaded or stored. This reads encoded barcode bars (including Code 128 and ITF), not OCR of printed numbers. Real labels should be checked on the intended phone before rollout.
+
+For a preview label, use [this sample Code 128 barcode](frontend/e2e/fixtures/barcode-0012345678901234.svg), containing `0012345678901234`. Automated browser tests use this label with a simulated camera and mocked API; they cover decoding, confirmation, lookup, retake, cancellation, permission denial, unreadable images, and mobile layout.
 
 ## Business rules
 
@@ -66,7 +79,15 @@ npm run dev
 
 Create `sbm_inventory` and a separate `sbm_inventory_test` database before migrating/testing. Seeders only create component categories. The administrator command prompts for a password of at least 12 characters. Staff accounts are managed in Settings.
 
-If restarting the development cluster created during implementation:
+For the current Homebrew development setup, start PostgreSQL before starting the backend:
+
+```sh
+brew services start postgresql@14
+```
+
+Pulling code and starting Vite do not start PostgreSQL or restore database data. If the backend reports `connection refused`, check the server and the `DB_HOST`/`DB_PORT` values in `backend/.env`, then run `php artisan config:clear` from `backend`. The example environment and PHPUnit configuration still default to the original port `55440`; override that port with `5432` when using Homebrew (for tests, run `DB_PORT=5432 php artisan test`).
+
+Only if the original temporary cluster directory still exists, it can be restarted with:
 
 ```sh
 pg_ctl -D /private/tmp/sbm-inventory-pg -l /private/tmp/sbm-inventory-pg.log -o '-p 55440 -h 127.0.0.1 -k /private/tmp' start
