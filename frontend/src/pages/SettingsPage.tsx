@@ -21,6 +21,7 @@ import {
   Status,
   Time,
 } from "../components/shared";
+import { LoginAppearanceSettings } from "../components/login-appearance-settings";
 import { useApp, useLoad } from "../hooks";
 export function SettingsPage() {
   const { meta, reload, notify } = useApp();
@@ -88,9 +89,10 @@ export function SettingsPage() {
     <>
       <Heading
         title="Workspace settings"
-        subtitle="Manage catalogue references, staff access and audit history."
+        subtitle="Manage catalogue references, staff access, login appearance and audit history."
         actions={
-          tab !== "audit" && (
+          tab !== "audit" &&
+          tab !== "appearance" && (
             <Button
               onClick={() => {
                 setEdit(null);
@@ -117,6 +119,7 @@ export function SettingsPage() {
           "phone-models": "Phone models",
           suppliers: "Suppliers",
           users: "Staff access",
+          appearance: "User interface",
           audit: "Audit trail",
         }).map(([k, v]) => (
           <button
@@ -128,8 +131,12 @@ export function SettingsPage() {
           </button>
         ))}
       </div>
-      <section className="panel">
-        {lists[tab] ? (
+      <section
+        className={tab === "appearance" ? "appearance-settings" : "panel"}
+      >
+        {tab === "appearance" ? (
+          <LoginAppearanceSettings />
+        ) : lists[tab] ? (
           <div className="reference-grid">
             {lists[tab].map((x) => (
               <div key={x.id}>

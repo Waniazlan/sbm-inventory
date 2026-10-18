@@ -1,6 +1,6 @@
 # Inventory API contract
 
-Base URL: `http://127.0.0.1:8018/api/v1` in development. Use HTTPS in production. Tokens stay server-side in ignored environment configuration. `INVENTORY_SALES_TOKEN` and `INVENTORY_REPAIR_TOKEN` must each contain at least 32 characters; generate independent random values. Never place them in frontend variables. Authentication failures return 401; validation/insufficient stock 422; a conflicting duplicate operation 409; rate limiting 429.
+Base URL: `http://127.0.0.1:8000/api/v1` in development. Use HTTPS in production. Tokens stay server-side in ignored environment configuration. `INVENTORY_SALES_TOKEN` and `INVENTORY_REPAIR_TOKEN` must each contain at least 32 characters; generate independent random values. Never place them in frontend variables. Authentication failures return 401; validation/insufficient stock 422; a conflicting duplicate operation 409; rate limiting 429.
 
 ## Catalogue and availability (Sales token)
 

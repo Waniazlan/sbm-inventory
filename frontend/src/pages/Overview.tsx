@@ -144,43 +144,42 @@ export function Overview() {
                   />
                 )}
               </section>
-              <section className="quick-panel">
-                <span className="eyebrow">KEEP THINGS MOVING</span>
-                <h2>
-                  Every part.
-                  <br />
-                  Every movement.
-                  <br />
-                  Accounted for.
-                </h2>
-                <p>
-                  Record stock when it arrives or is used. Your ledger keeps the
-                  full story.
-                </p>
-                <div>
-                  {user.role === "admin" ? (
-                    <>
-                      <Button onClick={() => setAction("receipt")}>
-                        <ArrowDownToLine size={18} />
-                        Receive stock
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setAction("manual_out")}
-                      >
-                        <ArrowUpFromLine size={18} />
-                        Issue or adjust
-                      </Button>
-                    </>
-                  ) : (
-                    <Button onClick={() => setAction("repair_usage")}>
-                      Record repair usage
-                    </Button>
-                  )}
+              <section
+                className="panel stock-actions"
+                aria-labelledby="stock-actions-heading"
+              >
+                <div className="panel-title">
+                  <div>
+                    <h2 id="stock-actions-heading">Stock actions</h2>
+                    <p>Record receipts, issues and parts usage.</p>
+                  </div>
                 </div>
-                <div className="ledger-mark">
-                  <ShieldCheck size={17} />
-                  Permanent movement history
+                <div className="stock-actions-body">
+                  <div className="stock-actions-buttons">
+                    {user.role === "admin" ? (
+                      <>
+                        <Button onClick={() => setAction("receipt")}>
+                          <ArrowDownToLine size={18} />
+                          Receive stock
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          onClick={() => setAction("manual_out")}
+                        >
+                          <ArrowUpFromLine size={18} />
+                          Issue or adjust
+                        </Button>
+                      </>
+                    ) : (
+                      <Button onClick={() => setAction("repair_usage")}>
+                        Record repair usage
+                      </Button>
+                    )}
+                  </div>
+                  <div className="ledger-mark">
+                    <ShieldCheck size={17} />
+                    Permanent movement history
+                  </div>
                 </div>
               </section>
             </div>

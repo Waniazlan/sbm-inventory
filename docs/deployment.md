@@ -31,6 +31,16 @@ pg_restore --list sbm_inventory.dump
 
 Also back up the deployment configuration and `APP_KEY` securely, separately from public artifacts. Decide backup frequency and point-in-time recovery based on acceptable transaction loss; enable WAL archival if needed.
 
+## Login appearance and private RustFS storage
+
+Administrators can change the shared login background in **Settings → User interface**. Choose a file, review the preview, then select **Save background**. **Restore animated default** removes the uploaded background and restores the aurora. JPEG, PNG, WebP, GIF and AVIF images are limited to 10 MB; MP4 and WebM videos are limited to 50 MB.
+
+Set `LOGIN_BACKGROUND_DISK=rustfs`, `RUSTFS_ENDPOINT`, `RUSTFS_REGION`, `RUSTFS_BUCKET=sbm-inventory-private`, `RUSTFS_ACCESS_KEY` and `RUSTFS_SECRET_KEY` in the protected backend environment. Provision a private bucket and allow the app's storage account to read, write and delete objects in `login-backgrounds/`. Apply migrations and clear/cache configuration after changes. Credentials and bucket URLs remain server-side; the login page retrieves the selected file through a public token route in Inventory. The background itself is visible to everyone visiting the login page, so use an image suitable for public display.
+
+Replacement and reset delete the previous object after the database change commits. Include the RustFS bucket in off-host backups alongside the database, which records the current object path and token. A database backup alone does not contain uploaded media. Coordinate object retention with database restore points.
+
+The included PHP-FPM, Caddy and Nginx configurations allow 50 MB uploads with a 55 MB request limit. Apply those limits to any upstream proxy as well. For local development, `bash scripts/serve-backend.sh` starts the backend on port 8000 with the same PHP upload limits; set `INVENTORY_API_PORT` if a different port is required and update the Vite proxy accordingly.
+
 ## Restore rehearsal
 
 Always restore into a new, empty isolated database first. Do not restore over live business data.

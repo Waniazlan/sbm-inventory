@@ -167,11 +167,10 @@ export function Heading({
   return (
     <div className="heading">
       <div>
-        <span className="eyebrow">INVENTORY WORKSPACE</span>
         <h1>{title}</h1>
         <p>{subtitle}</p>
       </div>
-      <div className="actions">{actions}</div>
+      {actions && <div className="actions">{actions}</div>}
     </div>
   );
 }

@@ -3,12 +3,15 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogueController;
 use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\LoginBackgroundController;
 use App\Http\Controllers\StockController;
 use App\Services\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
+    Route::get('login-background', [LoginBackgroundController::class, 'show']);
+    Route::get('login-background/media/{token}', [LoginBackgroundController::class, 'media'])->whereUuid('token')->name('login-background.media');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware(['web', 'throttle:login']);
     Route::middleware(['auth:sanctum', 'active', 'throttle:120,1'])->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
@@ -21,6 +24,8 @@ Route::prefix('v1')->group(function () {
         Route::post('movements', [StockController::class, 'post']);
         Route::get('repair-jobs', [CatalogueController::class, 'jobs']);
         Route::middleware('admin')->group(function () {
+            Route::post('settings/login-background', [LoginBackgroundController::class, 'store']);
+            Route::delete('settings/login-background', [LoginBackgroundController::class, 'destroy']);
             Route::post('items', [CatalogueController::class, 'save']);
             Route::put('items/{item}', [CatalogueController::class, 'save']);
             Route::post('metadata/{kind}', [CatalogueController::class, 'createMetadata']);

@@ -27,7 +27,7 @@
         <env name="DB_DATABASE" value="sbm_inventory_test" force="true"/>
         <env name="DB_URL" value="" force="true"/>
         <env name="DB_HOST" value="127.0.0.1"/>
-        <env name="DB_PORT" value="55440"/>
+        <env name="DB_PORT" value="5432"/>
         <env name="DB_USERNAME" value="inventory_local"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>

@@ -14,7 +14,7 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await page.goto("/");
   await page.getByLabel("Email address").fill(credentials.email);
   await page.getByLabel("Password", { exact: true }).fill(credentials.password);
-  await page.getByRole("button", { name: "Sign in to Inventory" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Stock overview" }),
   ).toBeVisible();

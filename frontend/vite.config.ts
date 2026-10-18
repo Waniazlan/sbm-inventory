@@ -6,8 +6,8 @@ export default defineConfig({
     port: 5175,
     strictPort: true,
     proxy: {
-      "/api": "http://127.0.0.1:8018",
-      "/sanctum": "http://127.0.0.1:8018",
+      "/api": "http://127.0.0.1:8000",
+      "/sanctum": "http://127.0.0.1:8000",
     },
   },
 });

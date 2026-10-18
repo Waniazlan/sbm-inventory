@@ -1,35 +1,33 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import axios from "axios";
 import {
   ArrowLeftRight,
-  ArrowRight,
   BarChart3,
   Check,
-  ChevronRight,
-  Layers,
   LayoutDashboard,
   LogOut,
   Menu,
   Package,
   Plug,
   Settings,
-  ShieldCheck,
   TriangleAlert,
   Wrench,
   X,
 } from "lucide-react";
 import {
   Navigate,
+  Link,
   NavLink,
   Route,
   Routes,
   useLocation,
 } from "react-router-dom";
-import { api, csrf, errorText, label, type Metadata, type User } from "./api";
+import { api, errorText, label, type Metadata, type User } from "./api";
 
-import { Button, ErrorBox, Field, Status } from "./components/shared";
+import { Button, ErrorBox, Status } from "./components/shared";
 import { Context, useLoad } from "./hooks";
+import { Login } from "./pages/Login";
 import { Catalogue } from "./pages/Catalogue";
 import { Integrations } from "./pages/Integrations";
 import { Movements } from "./pages/Movements";
@@ -37,99 +35,7 @@ import { Overview } from "./pages/Overview";
 import { Repairs } from "./pages/Repairs";
 import { Reports } from "./pages/Reports";
 import { SettingsPage } from "./pages/SettingsPage";
-export function Login({ done }: { done: (u: User) => void }) {
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  return (
-    <div className="login">
-      <section className="login-art">
-        <div className="brand">
-          sbm<span>.</span>
-          <small>INVENTORY</small>
-        </div>
-        <div>
-          <span className="eyebrow">SMART BUSINESS MANAGER</span>
-          <h1>
-            The right part.
-            <br />
-            Ready when
-            <br />
-            you need it.
-          </h1>
-          <p>Keep your stock accurate and your workshop moving.</p>
-          <div className="part-art">
-            <div>
-              <Package size={54} />
-              <span>Parts, in order.</span>
-            </div>
-            <div>
-              <Layers size={35} />
-              <span>Every unit accounted for.</span>
-            </div>
-          </div>
-        </div>
-        <small>Built for the way your shop works.</small>
-      </section>
-      <section className="login-form">
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            setBusy(true);
-            setError("");
-            try {
-              await csrf();
-              const r = await api.post<User>("/auth/login", {
-                email: f.get("email"),
-                password: f.get("password"),
-              });
-              done(r.data);
-            } catch (e) {
-              setError(errorText(e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <span className="eyebrow">YOUR INVENTORY WORKSPACE</span>
-          <h1>Welcome back</h1>
-          <p>Sign in to manage your parts and stock.</p>
-          <ErrorBox message={error} />
-          <Field label="Email address">
-            <input
-              name="email"
-              type="email"
-              required
-              autoComplete="username"
-              placeholder="you@yourshop.com"
-            />
-          </Field>
-          <Field label="Password">
-            <input
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="Enter your password"
-            />
-          </Field>
-          <Button disabled={busy}>
-            {busy ? "Signing in…" : "Sign in to Inventory"}
-            <ArrowRight size={18} />
-          </Button>
-          <div className="login-help">
-            <ShieldCheck size={20} />
-            <span>
-              Access for authorised shop staff.
-              <br />
-              Contact your administrator for an account.
-            </span>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
-}
+export { Login } from "./pages/Login";
 export function Shell({
   user,
   logout,
@@ -141,9 +47,48 @@ export function Shell({
   const [toast, setToast] = useState(""),
     [mobile, setMobile] = useState(false);
   const location = useLocation();
+  const menuRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   useEffect(() => {
     setMobile(false);
   }, [location.pathname]);
+  useEffect(() => {
+    if (!mobile) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    sidebarRef.current?.querySelector<HTMLElement>("a")?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMobile(false);
+        menuRef.current?.focus();
+      }
+      if (event.key === "Tab") {
+        const targets =
+          sidebarRef.current?.querySelectorAll<HTMLElement>("a, button");
+        if (!targets?.length) return;
+        const first = targets[0],
+          last = targets[targets.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", keydown);
+    const desktop = window.matchMedia("(min-width: 951px)");
+    const closeOnDesktop = () => {
+      if (desktop.matches) setMobile(false);
+    };
+    desktop.addEventListener("change", closeOnDesktop);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", keydown);
+      desktop.removeEventListener("change", closeOnDesktop);
+    };
+  }, [mobile]);
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(""), 5000);
@@ -162,41 +107,43 @@ export function Shell({
   ];
   return (
     <div className="app-shell">
-      <aside className={mobile ? "open" : ""}>
-        <div className="brand">
-          sbm<span>.</span>
-          <small>INVENTORY</small>
-        </div>
-        <div className="workspace">
-          <div>
-            <Package size={19} />
+      <aside
+        id="workspace-sidebar"
+        ref={sidebarRef}
+        className={`sidebar${mobile ? " open" : ""}`}
+        aria-label="Inventory sidebar"
+      >
+        <Link
+          to="/"
+          className="brand"
+          aria-label="SBM Inventory home"
+          onClick={() => setMobile(false)}
+        >
+          <div className="brand-symbol">
+            s<span>b</span>m<span className="brand-dot">.</span>
           </div>
-          <span>
-            Inventory workspace<small>Parts & accessories</small>
-          </span>
-        </div>
-        <span className="nav-label">WORKSPACE</span>
-        <nav>
+          <span>Inventory</span>
+        </Link>
+        <nav aria-label="Main navigation">
           {links
             .filter((l) => !l.admin || user.role === "admin")
             .map((l) => (
-              <NavLink end to={l.to} key={l.to}>
-                <l.icon size={19} />
-                {l.name}
+              <NavLink
+                end
+                to={l.to}
+                key={l.to}
+                onClick={() => setMobile(false)}
+              >
+                <l.icon size={19} aria-hidden="true" />
+                <span>{l.name}</span>
               </NavLink>
             ))}
         </nav>
         <div className="sidebar-bottom">
-          <div className="ledger-note">
-            <ShieldCheck size={18} />
-            <span>
-              Stock you can trace.<small>Every movement stays on record.</small>
-            </span>
-          </div>
           <div className="profile">
             <span className="avatar">{user.name.slice(0, 1)}</span>
             <div>
-              <strong>{user.name}</strong>
+              <strong title={user.name}>{user.name}</strong>
               <small>{label(user.role)}</small>
             </div>
             <button
@@ -218,28 +165,26 @@ export function Shell({
         />
       )}
       <div className="main-shell">
-        <header>
+        <header className="topbar">
           <div>
             <button
               className="icon-button mobile-toggle"
+              ref={menuRef}
               onClick={() => setMobile(!mobile)}
               aria-label="Open menu"
+              aria-expanded={mobile}
+              aria-controls="workspace-sidebar"
             >
               <Menu size={22} />
             </button>
             <span className="breadcrumb">
-              Workspace <ChevronRight size={13} />
-              <b>
+              <strong>
                 {links.find((l) => l.to === location.pathname)?.name ||
                   "Inventory"}
-              </b>
+              </strong>
             </span>
           </div>
-          <div>
-            <span className="header-status">
-              <span />
-              Inventory ledger
-            </span>
+          <div className="topbar-right">
             <span className="avatar small-avatar">{user.name.slice(0, 1)}</span>
           </div>
         </header>
@@ -276,12 +221,6 @@ export function Shell({
             )}
           </Status>
         </main>
-        <footer>
-          Smart Business Manager{" "}
-          <span>
-            Inventory · {metadata.data?.timezone || "Asia/Kuala_Lumpur"}
-          </span>
-        </footer>
       </div>
       {toast && (
         <div className="toast" role="status">

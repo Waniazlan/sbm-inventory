@@ -15,6 +15,8 @@ return [
 
     'default' => env('FILESYSTEM_DISK', 'local'),
 
+    'login_background_disk' => env('LOGIN_BACKGROUND_DISK', 'rustfs'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
@@ -34,6 +36,7 @@ return [
             'region' => env('RUSTFS_REGION', 'us-east-1'), 'bucket' => env('RUSTFS_BUCKET'),
             'endpoint' => env('RUSTFS_ENDPOINT'), 'use_path_style_endpoint' => true,
             'visibility' => 'private', 'throw' => true,
+            'http' => ['connect_timeout' => 5, 'timeout' => 30], 'retries' => 1,
         ],
 
         'local' => [

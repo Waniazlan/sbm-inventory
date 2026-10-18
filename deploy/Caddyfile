@@ -7,7 +7,7 @@ inventory.vgadget.my {
 	@hidden path_regexp hidden (^|/)\.
 	respond @hidden 404
 	request_body {
-		max_size 6MB
+		max_size 55MB
 	}
 
 	@backend path /api /api/* /sanctum /sanctum/* /up

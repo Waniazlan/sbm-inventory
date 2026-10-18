@@ -5,11 +5,11 @@ Inventory Management for the SBM phone repair shop suite. Laravel 12 / PHP 8.4, 
 ## Open the local application
 
 - Frontend: **http://127.0.0.1:5175**
-- API: **http://127.0.0.1:8018**
+- API: **http://127.0.0.1:8000**
 - Initial local administrator: see the ignored `backend/.review-credentials.json` file. This account has a randomly generated password; no fixed production credentials are shipped.
 - Database: local Homebrew PostgreSQL at port `5432`, with separate databases `sbm_inventory` and `sbm_inventory_test`. Set `DB_PORT=5432` in `backend/.env` for this setup; the included Docker setup uses `55441`.
 
-Use persistent PostgreSQL storage for ongoing work. The original development cluster at `/private/tmp/sbm-inventory-pg` on port `55440` used temporary storage and may disappear when temporary files are cleared. The current local setup uses Homebrew PostgreSQL 14 storage at `/opt/homebrew/var/postgresql@14`; the supplied Docker configuration uses PostgreSQL 16 with a persistent volume.
+Use persistent PostgreSQL storage for ongoing work. The original development cluster at `/private/tmp/sbm-inventory-pg` on port `55440` used temporary storage and may disappear when temporary files are cleared. The current local setup uses Homebrew PostgreSQL 16 storage at `/opt/homebrew/var/postgresql@16`; the supplied Docker configuration uses PostgreSQL 16 with a persistent volume.
 
 ## Workflows
 
@@ -58,15 +58,18 @@ For a preview label, use [this sample Code 128 barcode](frontend/e2e/fixtures/ba
 
 Requirements: PHP 8.4 with PDO PostgreSQL, mbstring, XML, ctype, curl; Composer 2; Node 24 recommended (22.14+ supported); PostgreSQL 14+.
 
+The repository's `.tool-versions` selects Node 24.13.0 when using asdf. Install that version with `asdf install nodejs 24.13.0` if it is not already available.
+
 ```sh
 cd backend
+mkdir -p bootstrap/cache storage/framework/{cache/data,sessions,views} storage/logs
 composer install
 cp .env.example .env
 # Set DB_HOST/PORT/DATABASE/USERNAME/PASSWORD for your PostgreSQL installation.
 php artisan key:generate
 php artisan migrate --seed
 php artisan sbm:create-admin you@yourshop.com
-php artisan serve --host=127.0.0.1 --port=8018
+bash ../scripts/serve-backend.sh
 ```
 
 In another terminal:
@@ -82,12 +85,12 @@ Create `sbm_inventory` and a separate `sbm_inventory_test` database before migra
 For the current Homebrew development setup, start PostgreSQL before starting the backend:
 
 ```sh
-brew services start postgresql@14
+brew services start postgresql@16
 ```
 
-Pulling code and starting Vite do not start PostgreSQL or restore database data. If the backend reports `connection refused`, check the server and the `DB_HOST`/`DB_PORT` values in `backend/.env`, then run `php artisan config:clear` from `backend`. The example environment and PHPUnit configuration still default to the original port `55440`; override that port with `5432` when using Homebrew (for tests, run `DB_PORT=5432 php artisan test`).
+Pulling code and starting Vite do not start PostgreSQL or restore database data. If the backend reports `connection refused`, check the server and the `DB_HOST`/`DB_PORT` values in `backend/.env`, then run `php artisan config:clear` from `backend`. The example environment and PHPUnit configuration default to port `5432` for Homebrew. When using Docker, set `DB_PORT=55441` in `backend/.env` and run tests with `DB_PORT=55441 php artisan test`.
 
-Only if the original temporary cluster directory still exists, it can be restarted with:
+Only if the original temporary cluster is still complete (including `PG_VERSION`, configuration, and database files), it can be restarted with:
 
 ```sh
 pg_ctl -D /private/tmp/sbm-inventory-pg -l /private/tmp/sbm-inventory-pg.log -o '-p 55440 -h 127.0.0.1 -k /private/tmp' start
