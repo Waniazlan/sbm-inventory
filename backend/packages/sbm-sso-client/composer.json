@@ -1,0 +1,14 @@
+{
+    "name": "sbm/sso-client",
+    "description": "Shared first-party SBM OpenID Connect session integration",
+    "type": "library",
+    "version": "1.0.0",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.4",
+        "illuminate/support": "^12.0",
+        "socialiteproviders/openidconnect": "^1.0.1"
+    },
+    "autoload": { "psr-4": { "Sbm\\SsoClient\\": "src/" } },
+    "extra": { "laravel": { "providers": ["Sbm\\SsoClient\\SsoServiceProvider"] } }
+}

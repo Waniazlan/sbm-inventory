@@ -10,7 +10,7 @@ inventory.vgadget.my {
 		max_size 55MB
 	}
 
-	@backend path /api /api/* /sanctum /sanctum/* /up
+	@backend path /api /api/* /sanctum /sanctum/* /auth/sso /auth/sso/* /up
 	handle @backend {
 		root * /var/www/sbm-inventory/backend/public
 		rewrite * /index.php

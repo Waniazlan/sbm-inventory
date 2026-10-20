@@ -3,6 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev libzi
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 WORKDIR /app
 COPY composer.json composer.lock ./
+COPY packages/ ./packages/
 RUN composer install --no-interaction --no-scripts --prefer-dist
 COPY . .
 RUN composer dump-autoload --optimize

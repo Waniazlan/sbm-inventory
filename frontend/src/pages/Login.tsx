@@ -13,6 +13,7 @@ import { LoginBackground } from "../components/LoginBackground";
 import { Button } from "../components/shared";
 import { api, csrf, errorText } from "../api";
 import type { User } from "../api";
+import { SsoSignIn } from "../components/SsoSignIn";
 import "./login.css";
 
 export function Login({ done }: { done: (user: User) => void }) {
@@ -71,6 +72,7 @@ export function Login({ done }: { done: (user: User) => void }) {
             <p className="login-description login-enter">
               Welcome back. Let’s get your day started.
             </p>
+            <SsoSignIn />
             <form onSubmit={submit} noValidate aria-busy={busy}>
               <div id="login-error">
                 {error && (

@@ -104,7 +104,7 @@ The Inventory endpoints are implemented and tested, but **the current sbm-sales 
 
 [Integration contract](docs/integration-contracts.md) describes request bodies, tokens, idempotency, return rules, pagination and the exact Sales changes needed. Neither Sales nor the portal was modified. No real Repair Tracking service was available to test.
 
-For the portal, set the Inventory application's URL to `http://127.0.0.1:5175` in the appropriate branch settings. Login remains separate; there is no cross-application SSO.
+For the portal, set the Inventory application's URL to `http://127.0.0.1:5175` in the appropriate branch settings. Administrator SSO is available through SmartBusinessManager; see [SSO setup](docs/sso.md).
 
 ## Verification
 
@@ -126,3 +126,7 @@ See [verification evidence](docs/verification.md) and [deployment / backup instr
 ## Native production setup
 
 Deployment files for `inventory.vgadget.my` are prepared under `deploy/` and `scripts/install-production.sh`. See [deployment instructions](docs/deployment.md). Dependencies and frontend build are installed; activation requires running the installer with sudo.
+
+## Central administrator sign-in
+
+SmartBusinessManager administrator SSO is implemented with OpenID Connect. See [configuration, account linking, hosting and logout](docs/sso.md). Existing local password login remains available.

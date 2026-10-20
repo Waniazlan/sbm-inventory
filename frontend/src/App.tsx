@@ -249,7 +249,10 @@ export function App() {
       .get<User>("/auth/me")
       .then((r) => setUser(r.data))
       .catch((e) => {
-        if (!axios.isAxiosError(e) || e.response?.status !== 401)
+        if (
+          !axios.isAxiosError(e) ||
+          ![401, 419].includes(e.response?.status ?? 0)
+        )
           setError(errorText(e));
       })
       .finally(() => setLoading(false));
