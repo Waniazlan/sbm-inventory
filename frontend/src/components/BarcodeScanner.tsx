@@ -1,37 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button, ErrorBox, Field, Modal } from "./shared";
 
-export const validBarcode = (value: string) => /^[0-9]{16}$/.test(value);
-
-// Loaded only when a photo is decoded; images never leave the browser.
-async function decode(canvas: HTMLCanvasElement): Promise<string> {
-  const [{ BrowserMultiFormatOneDReader }, { DecodeHintType }] =
-    await Promise.all([import("@zxing/browser"), import("@zxing/library")]);
-  const reader = new BrowserMultiFormatOneDReader(
-    new Map([[DecodeHintType.TRY_HARDER, true]]),
-  );
-  // Try both orientations for labels photographed sideways.
-  for (const rotated of [false, true]) {
-    const source = document.createElement("canvas");
-    source.width = rotated ? canvas.height : canvas.width;
-    source.height = rotated ? canvas.width : canvas.height;
-    const ctx = source.getContext("2d")!;
-    if (rotated) {
-      ctx.translate(source.width, 0);
-      ctx.rotate(Math.PI / 2);
-    }
-    ctx.drawImage(canvas, 0, 0);
-    try {
-      return reader.decodeFromCanvas(source).getText();
-    } catch {
-      /* Try the other orientation. */
-    }
-  }
-  throw new Error(
-    "No readable barcode found. Retake with the full barcode in focus, good lighting and no glare.",
-  );
-}
+import {
+  BARCODE_MAX_LENGTH,
+  decodeBarcode,
+  NoBarcodeFound,
+  scanAngles,
+  validBarcode,
+} from "../lib/barcode";
 
 export function BarcodeScanner({
   close,
@@ -45,6 +22,7 @@ export function BarcodeScanner({
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const generation = useRef(0);
+  const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -52,10 +30,60 @@ export function BarcodeScanner({
   const [preview, setPreview] = useState("");
   const [value, setValue] = useState("");
 
-  function stopCamera() {
+  function releaseCamera() {
+    if (scanTimer.current !== null) clearTimeout(scanTimer.current);
+    scanTimer.current = null;
     stream.current?.getTracks().forEach((track) => track.stop());
     stream.current = null;
+  }
+
+  function stopCamera() {
+    releaseCamera();
     setReady(false);
+  }
+
+  async function scanFrame(current: number, attempt = 0) {
+    if (current !== generation.current || !stream.current) return;
+    const camera = video.current;
+    if (camera && camera.readyState >= 2 && camera.videoWidth) {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = camera.videoWidth;
+        canvas.height = camera.videoHeight;
+        canvas.getContext("2d")!.drawImage(camera, 0, 0);
+        const result = await decodeBarcode(
+          canvas,
+          scanAngles[attempt % scanAngles.length],
+        );
+        if (current !== generation.current || !stream.current) return;
+        if (validBarcode(result)) {
+          setPreview(canvas.toDataURL("image/jpeg"));
+          setValue(result);
+          setError("");
+          stopCamera();
+          return;
+        }
+        setError(
+          `Detected "${result}" (${result.length} characters). Use 1–100 letters and numbers only. Keep scanning a valid item label.`,
+        );
+      } catch (error) {
+        if (current !== generation.current || !stream.current) return;
+        if (!(error instanceof NoBarcodeFound)) {
+          stopCamera();
+          setError(
+            "The live barcode reader could not start or read the camera. Retry the camera or reload this page. " +
+              (error instanceof Error ? error.message : ""),
+          );
+          return;
+        }
+      }
+    }
+    if (current === generation.current && stream.current) {
+      scanTimer.current = setTimeout(
+        () => void scanFrame(current, attempt + 1),
+        250,
+      );
+    }
   }
 
   useEffect(() => {
@@ -68,7 +96,7 @@ export function BarcodeScanner({
       try {
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error(
-            "Camera access needs HTTPS or localhost. Choose a barcode photo or enter the digits below.",
+            "Camera access needs HTTPS or localhost. Choose a barcode photo or enter the barcode below.",
           );
         }
         const media = await navigator.mediaDevices.getUserMedia({
@@ -84,16 +112,31 @@ export function BarcodeScanner({
           return;
         }
         stream.current = media;
+        // Some phone cameras need continuous autofocus for nearby labels.
+        // Unsupported or rejected focus settings must not prevent scanning.
+        const track = media.getVideoTracks()[0];
+        const capabilities = track?.getCapabilities?.() as
+          (MediaTrackCapabilities & { focusMode?: string[] }) | undefined;
+        if (capabilities?.focusMode?.includes("continuous")) {
+          void track
+            .applyConstraints({
+              advanced: [
+                { focusMode: "continuous" } as MediaTrackConstraintSet,
+              ],
+            })
+            .catch(() => {});
+        }
         if (video.current) {
           video.current.srcObject = media;
           await video.current.play();
+          if (current === generation.current) void scanFrame(current);
         }
       } catch (e) {
         if (current !== generation.current) return;
         stopCamera();
         setError(
           e instanceof DOMException
-            ? "Camera unavailable or permission denied. Allow camera access and retry, choose a photo, or enter the digits below."
+            ? "Camera unavailable or permission denied. Allow camera access and retry, choose a photo, or enter the barcode below."
             : (e as Error).message,
         );
       }
@@ -101,60 +144,46 @@ export function BarcodeScanner({
     void open();
     return () => {
       generation.current++;
-      stream.current?.getTracks().forEach((track) => track.stop());
-      stream.current = null;
+      releaseCamera();
     };
   }, [cameraAttempt]);
 
-  async function readPhoto(canvas: HTMLCanvasElement, current: number) {
-    setPreview(canvas.toDataURL("image/jpeg"));
-    const result = await decode(canvas);
-    if (current !== generation.current) return;
-    if (!validBarcode(result)) {
-      throw new Error(
-        "This barcode does not contain exactly 16 digits. Check the item label and try again.",
-      );
-    }
-    setValue(result);
-  }
-
-  async function capture(file?: File) {
+  async function capture(file: File) {
     // Invalidate any pending permission request before using a supplied photo.
     const current = ++generation.current;
     setBusy(true);
     setError("");
     setValue("");
+    stopCamera();
     try {
       const canvas = document.createElement("canvas");
-      if (file) {
-        stopCamera();
-        if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) {
-          throw new Error("Choose an image smaller than 20 MB.");
-        }
-        const url = URL.createObjectURL(file);
-        try {
-          const photo = new Image();
-          photo.src = url;
-          await photo.decode();
-          if (current !== generation.current) return;
-          const scale = Math.min(1, 2560 / Math.max(photo.width, photo.height));
-          canvas.width = Math.round(photo.width * scale);
-          canvas.height = Math.round(photo.height * scale);
-          canvas
-            .getContext("2d")!
-            .drawImage(photo, 0, 0, canvas.width, canvas.height);
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      } else {
-        if (!video.current?.videoWidth)
-          throw new Error("Wait for the camera preview, then try again.");
-        canvas.width = video.current.videoWidth;
-        canvas.height = video.current.videoHeight;
-        canvas.getContext("2d")!.drawImage(video.current, 0, 0);
-        stopCamera();
+      if (!file.type.startsWith("image/") || file.size > 20 * 1024 * 1024) {
+        throw new Error("Choose an image smaller than 20 MB.");
       }
-      await readPhoto(canvas, current);
+      const url = URL.createObjectURL(file);
+      try {
+        const photo = new Image();
+        photo.src = url;
+        await photo.decode();
+        if (current !== generation.current) return;
+        const scale = Math.min(1, 2560 / Math.max(photo.width, photo.height));
+        canvas.width = Math.round(photo.width * scale);
+        canvas.height = Math.round(photo.height * scale);
+        canvas
+          .getContext("2d")!
+          .drawImage(photo, 0, 0, canvas.width, canvas.height);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      setPreview(canvas.toDataURL("image/jpeg"));
+      const result = await decodeBarcode(canvas);
+      if (current !== generation.current) return;
+      if (!validBarcode(result)) {
+        throw new Error(
+          "This barcode must contain 1–100 letters and numbers only. Check the item label and try again.",
+        );
+      }
+      setValue(result);
     } catch (e) {
       if (current === generation.current)
         setError(
@@ -169,13 +198,13 @@ export function BarcodeScanner({
   return (
     <Modal
       title="Scan barcode"
-      subtitle="Open camera → Snap → Review and confirm"
+      subtitle="Open camera → Automatic detection → Review and confirm"
       close={close}
     >
       <div className="barcode-scanner">
         <p>
           Keep the entire barcode inside the frame, including the blank space at
-          both ends.
+          both ends. The barcode value is captured automatically when detected.
         </p>
         <div className="barcode-camera">
           <video
@@ -194,18 +223,11 @@ export function BarcodeScanner({
         <div className="barcode-actions">
           <Button
             type="button"
-            disabled={!ready || busy}
-            onClick={() => void capture()}
-          >
-            <Camera size={17} /> {busy ? "Reading barcode…" : "Snap barcode"}
-          </Button>
-          <Button
-            type="button"
             variant="secondary"
             disabled={busy}
             onClick={() => setCameraAttempt((n) => n + 1)}
           >
-            <RotateCcw size={16} /> {preview ? "Retake photo" : "Retry camera"}
+            <RotateCcw size={16} /> {preview ? "Scan again" : "Retry camera"}
           </Button>
         </div>
         <Field label="Choose barcode photo">
@@ -220,21 +242,30 @@ export function BarcodeScanner({
             }}
           />
         </Field>
-        <Field label="Review barcode (16 digits)">
+        <Field label="Review barcode (letters and numbers)">
           <input
             value={value}
-            onChange={(e) => setValue(e.target.value)}
-            inputMode="numeric"
-            maxLength={16}
+            onChange={(e) => {
+              generation.current++;
+              stopCamera();
+              setError("");
+              setValue(e.target.value);
+            }}
+            inputMode="text"
+            autoCapitalize="off"
+            spellCheck={false}
+            maxLength={BARCODE_MAX_LENGTH}
             autoComplete="off"
-            placeholder="Or enter the 16 digits manually"
+            placeholder="Or enter the barcode manually"
             disabled={busy}
           />
         </Field>
         <p role="status">
           {validBarcode(value)
-            ? "16 digits ready. Check them against the label before confirming."
-            : "Exactly 16 digits required. Leading zeroes are kept."}
+            ? "Barcode captured. Check it against the label before confirming."
+            : ready
+              ? "Scanning automatically… Point the camera at a barcode."
+              : "Use 1–100 letters and numbers. Leading zeroes and letter case are kept."}
         </p>
         <small>
           Photos are processed on this device and are not uploaded or saved.

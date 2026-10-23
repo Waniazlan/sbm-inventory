@@ -17,9 +17,11 @@ use Illuminate\Validation\ValidationException;
 
 class CatalogueController
 {
+    private const BARCODE_FORMAT_RULE = 'regex:/\A[A-Za-z0-9]{1,100}\z/';
+
     public static function query(Request $r)
     {
-        $r->validate(['search' => 'nullable|string|max:200', 'barcode' => ['nullable', 'string', 'regex:/\A[0-9]{16}\z/'], 'category_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer']);
+        $r->validate(['search' => 'nullable|string|max:200', 'barcode' => ['nullable', 'string', self::BARCODE_FORMAT_RULE], 'category_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer']);
         $q = Item::with(['category', 'supplier', 'phoneModels']);
         if ($r->filled('barcode')) {
             $q->where('barcode', $r->query('barcode'));
@@ -84,11 +86,11 @@ class CatalogueController
                 $item ? 'sometimes' : 'required',
                 $item && ! $item->barcode ? 'nullable' : 'required',
                 'string',
-                'regex:/\A[0-9]{16}\z/',
+                self::BARCODE_FORMAT_RULE,
                 Rule::unique('items', 'barcode')->ignore($item?->id),
             ],
         ], [
-            'barcode.regex' => 'The barcode must contain exactly 16 digits.',
+            'barcode.regex' => 'The barcode must contain 1–100 letters and numbers only.',
             'barcode.unique' => 'This barcode is already assigned to another item.',
         ]);
         $d = $r->validate(['sku' => ['required', 'string', 'max:100', Rule::unique('items')->ignore($item?->id)], 'name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'required|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);

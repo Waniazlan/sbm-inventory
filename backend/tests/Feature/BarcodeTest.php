@@ -30,17 +30,31 @@ class BarcodeTest extends TestCase
         $this->getJson('/api/v1/items?barcode=0012345678901234')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id);
         $this->getJson('/api/v1/items?barcode=0012345678901235')->assertOk()->assertJsonCount(0, 'data');
         $this->getJson('/api/v1/items?search=0012345678901234')->assertOk()->assertJsonCount(1, 'data');
-        $this->getJson('/api/v1/items?barcode=1234')->assertUnprocessable();
+        $this->getJson('/api/v1/items?barcode=1234')->assertOk()->assertJsonCount(0, 'data');
         $this->putJson('/api/v1/items/'.$id, array_replace($this->payload, ['barcode' => null]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
     }
 
-    public function test_new_items_require_exactly_sixteen_ascii_digits_as_a_string(): void
+    public function test_new_items_require_one_to_one_hundred_ascii_letters_and_numbers_as_a_string(): void
     {
-        foreach ([null, '', '123456789012345', '12345678901234567', '123456789012345a', '１２３４５６７８９０１２３４５６', 1234567890123456] as $barcode) {
+        foreach ([null, '', str_repeat('A', 101), 'ABC-123', 'ABC 123', 'ABC_123', '１２３４５６７８９０１２３４５６', 1234567890123456] as $barcode) {
             $this->postJson('/api/v1/items', array_replace($this->payload, ['barcode' => $barcode]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
         }
         unset($this->payload['barcode']);
         $this->postJson('/api/v1/items', $this->payload)->assertUnprocessable()->assertJsonValidationErrors('barcode');
+    }
+
+    public function test_alphanumeric_and_variable_length_barcodes_can_be_saved_updated_and_found(): void
+    {
+        foreach (['00AbC123xyZ', '00123456789012', 'A', str_repeat('Z', 100)] as $index => $barcode) {
+            $payload = array_replace($this->payload, ['sku' => 'ALPHA-'.$index, 'barcode' => $barcode]);
+            $id = $this->postJson('/api/v1/items', $payload)->assertCreated()->assertJsonPath('barcode', $barcode)->json('id');
+            $this->putJson('/api/v1/items/'.$id, $payload)->assertOk()->assertJsonPath('barcode', $barcode);
+            $this->getJson('/api/v1/items?barcode='.$barcode)->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id);
+            $this->postJson('/api/v1/items', array_replace($payload, ['sku' => 'DUP-'.$index]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
+        }
+        $this->getJson('/api/v1/items?barcode=00ABC123XYZ')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/items?barcode=ABC-123')->assertUnprocessable();
+        $this->getJson('/api/v1/items?barcode='.str_repeat('Z', 101))->assertUnprocessable();
     }
 
     public function test_existing_items_can_be_edited_and_assigned_barcodes_later(): void

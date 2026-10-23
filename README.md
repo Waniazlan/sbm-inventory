@@ -16,7 +16,7 @@ Use persistent PostgreSQL storage for ongoing work. The original development clu
 | Screen | Features |
 | --- | --- |
 | Overview | Live stock counts, standard-cost value, low-stock attention list, recent movements |
-| Item catalogue | Unique SKU and 16-digit barcode, camera/photo capture and barcode lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
+| Item catalogue | Unique SKU and alphanumeric barcode, camera/photo capture and barcode lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
 | Receive stock | Quantity, supplier/reference, actual unit cost, optional batch and serial notes |
 | Movement ledger | Receipts, issues, counts, sales, repair usage, returns and linked reversals; search, date/type/user filters |
 | Repair parts | Administrator assigns external repair references; technicians consume parts only on their active assignments |
@@ -29,18 +29,20 @@ Start by adding phone models and suppliers in Settings. Create items with compat
 
 No business sample stock is seeded. Browser checks create explicitly named verification items and immutable history; successful runs reverse their receipts and deactivate those items.
 
-## Barcode flow (first implementation)
+## Barcode flow
 
 1. Open **Item catalogue → Add item** (or **Edit** an existing item).
-2. Select **Scan barcode**, allow camera access, frame the entire barcode, and tap **Snap barcode**.
-3. Review the detected 16 digits and select **Use barcode**. Complete the item details and **Save item**.
-4. To find it later, select **Scan barcode** at the top of the catalogue, capture the label, then **Find item**. Scans search all items, including inactive items, regardless of category or stock filters.
+2. Select **Scan barcode**, allow camera access, frame the entire barcode, and hold steady. The camera automatically detects a valid alphanumeric barcode, captures its value, and stops for review. Select **Scan again** to restart.
+3. Review the detected letters and numbers and select **Use barcode**. Complete the item details and **Save item**.
+4. To find it later, select **Scan barcode** at the top of the catalogue, let the camera detect the label, then select **Find item**. Scans search all items, including inactive items, regardless of category or stock filters.
 
-The barcode belongs to a catalogue item (all stock of that item), not to each individual physical unit. New items require a unique 16-digit barcode; existing items can be assigned one when available. Leading zeroes are retained, duplicates are rejected, and assigned barcodes cannot be cleared. A scan only fills the form; saving the item commits it.
+The barcode belongs to a catalogue item (all stock of that item), not to each individual physical unit. New items require a unique alphanumeric barcode; existing items can be assigned one when available. Barcodes accept 1–100 letters and numbers. Leading zeroes and letter case are retained, duplicates are rejected, and assigned barcodes cannot be cleared. A scan only fills the form; saving the item commits it.
 
-Camera access requires HTTPS or localhost. **Choose barcode photo** and manual entry are available if camera access is unavailable. Photos are decoded locally using ZXing and are never uploaded or stored. This reads encoded barcode bars (including Code 128 and ITF), not OCR of printed numbers. Real labels should be checked on the intended phone before rollout.
+Camera access requires HTTPS or localhost. **Choose barcode photo** and manual entry are available if camera access is unavailable. Photos are decoded locally using ZXing and are never uploaded or stored. This reads encoded barcode bars (including Code 128, Code 39 and ITF), not OCR of printed text. Real labels should be checked on the intended phone before rollout.
 
-For a preview label, use [this sample Code 128 barcode](frontend/e2e/fixtures/barcode-0012345678901234.svg), containing `0012345678901234`. Automated browser tests use this label with a simulated camera and mocked API; they cover decoding, confirmation, lookup, retake, cancellation, permission denial, unreadable images, and mobile layout.
+For a preview label, use [this sample Code 128 barcode](frontend/e2e/fixtures/barcode-0012345678901234.svg), containing `0012345678901234`. For letters and numbers, use [this mixed-case Code 128 barcode](frontend/e2e/fixtures/barcode-code128-00AbC123xyZ.svg), containing `00AbC123xyZ`. Automated browser tests use these labels with a simulated camera and mocked API; they cover automatic decoding after empty frames, letters and numbers, confirmation, lookup, scanning again, cancellation, permission denial, unreadable images, and mobile layout.
+
+Existing installations must run `cd backend && php artisan migrate` to widen the barcode column and update its format constraint before saving alphanumeric barcodes.
 
 ## Business rules
 

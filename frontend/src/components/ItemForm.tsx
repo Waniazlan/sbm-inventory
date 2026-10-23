@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Camera } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
+import { BARCODE_MAX_LENGTH, BARCODE_PATTERN } from "../lib/barcode";
 
 import { api, errorText, label, type Item } from "../api";
 
@@ -97,18 +98,20 @@ export function ItemForm({
               />
             </Field>
             <div className="barcode-field wide">
-              <Field label="Item barcode (16 digits)">
+              <Field label="Item barcode (letters and numbers)">
                 <input
                   name="barcode"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
                   required={!item || !!item.barcode}
-                  pattern="[0-9]{16}"
-                  maxLength={16}
-                  inputMode="numeric"
+                  pattern={BARCODE_PATTERN}
+                  maxLength={BARCODE_MAX_LENGTH}
+                  inputMode="text"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   autoComplete="off"
-                  placeholder="Scan or enter 16 digits"
-                  title="Enter exactly 16 digits"
+                  placeholder="Scan or enter letters and numbers"
+                  title="Enter 1–100 letters and numbers"
                   aria-describedby="barcode-help"
                 />
               </Field>

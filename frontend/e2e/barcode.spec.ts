@@ -2,9 +2,29 @@ import { test, expect, type Page } from "@playwright/test";
 import fs from "node:fs";
 
 const barcode = "0012345678901234";
-const fixture = new URL(`./fixtures/barcode-${barcode}.svg`, import.meta.url)
-  .pathname;
-const imageUrl = `data:image/svg+xml;base64,${fs.readFileSync(fixture).toString("base64")}`;
+function fixturePath(name: string) {
+  return new URL(`./fixtures/${name}`, import.meta.url).pathname;
+}
+
+function fixtureImage(name: string) {
+  const mimeType = name.endsWith(".svg") ? "image/svg+xml" : "image/jpeg";
+  return `data:${mimeType};base64,${fs.readFileSync(fixturePath(name)).toString("base64")}`;
+}
+
+async function expectCameraState(page: Page, state: MediaStreamTrackState) {
+  expect(
+    await page.evaluate(
+      (expected) =>
+        (
+          window as unknown as { cameraTracks: MediaStreamTrack[] }
+        ).cameraTracks.every((track) => track.readyState === expected),
+      state,
+    ),
+  ).toBe(true);
+}
+
+const fixture = fixturePath(`barcode-${barcode}.svg`);
+const imageUrl = fixtureImage(`barcode-${barcode}.svg`);
 const item = {
   id: 1,
   sku: "SCAN-01",
@@ -23,7 +43,42 @@ const item = {
   active: true,
 };
 
-async function setup(page: Page, camera: "photo" | "denied" = "photo") {
+// Actual label images supplied to reproduce scanning failures.
+for (const [name, value] of [
+  ["numeric", "1234567891023456"],
+  ["alphanumeric", "ASL1209876543127"],
+]) {
+  for (const mode of ["camera", "photo"] as const) {
+    test(`reads supplied ${name} sample through ${mode}`, async ({ page }) => {
+      const file = fixturePath(`barcode-sample-${name}.jpeg`);
+      const image = fixtureImage(`barcode-sample-${name}.jpeg`);
+      await setup(page, mode === "camera" ? "photo" : "denied", image);
+      await page.getByRole("button", { name: "Scan barcode" }).click();
+      if (mode === "photo") {
+        await page.getByLabel("Choose barcode photo").setInputFiles(file);
+      }
+      await expect(
+        page.getByLabel("Review barcode (letters and numbers)"),
+      ).toHaveValue(value);
+      await expect(
+        page.getByRole("button", { name: "Find item" }),
+      ).toBeEnabled();
+      if (mode === "camera") await expectCameraState(page, "ended");
+      const lookup = page.waitForRequest(
+        (request) =>
+          new URL(request.url()).searchParams.get("barcode") === value,
+      );
+      await page.getByRole("button", { name: "Find item" }).click();
+      await lookup;
+    });
+  }
+}
+
+async function setup(
+  page: Page,
+  camera: "photo" | "denied" | "blank" | "angled" | "delayed" = "photo",
+  cameraImage = imageUrl,
+) {
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     const query = new URL(route.request().url()).searchParams;
@@ -58,7 +113,25 @@ async function setup(page: Page, camera: "photo" | "denied" = "photo") {
           const canvas = document.createElement("canvas");
           canvas.width = img.width;
           canvas.height = img.height;
-          canvas.getContext("2d")!.drawImage(img, 0, 0);
+          canvas.getContext("2d")!.fillRect(0, 0, canvas.width, canvas.height);
+          if (camera !== "blank" && camera !== "delayed")
+            canvas.getContext("2d")!.drawImage(img, 0, 0);
+          if (camera === "delayed") {
+            setTimeout(
+              () => canvas.getContext("2d")!.drawImage(img, 0, 0),
+              1500,
+            );
+          }
+          if (camera === "angled") {
+            canvas.width = 1000;
+            canvas.height = 1000;
+            const ctx = canvas.getContext("2d")!;
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, 1000, 1000);
+            ctx.translate(500, 500);
+            ctx.rotate(Math.PI / 4);
+            ctx.drawImage(img, -img.width / 2, -img.height / 2);
+          }
           const stream = canvas.captureStream(5);
           (
             window as unknown as { cameraTracks: MediaStreamTrack[] }
@@ -67,7 +140,7 @@ async function setup(page: Page, camera: "photo" | "denied" = "photo") {
         },
       });
     },
-    { imageUrl, camera },
+    { imageUrl: cameraImage, camera },
   );
   await page.goto("/catalogue");
   await expect(
@@ -75,7 +148,7 @@ async function setup(page: Page, camera: "photo" | "denied" = "photo") {
   ).toBeVisible();
 }
 
-test("snap real barcode pixels, confirm, and save the exact string", async ({
+test("automatically detect real barcode pixels, confirm, and save the exact string", async ({
   page,
 }) => {
   await setup(page);
@@ -88,25 +161,13 @@ test("snap real barcode pixels, confirm, and save the exact string", async ({
     .getByRole("button", { name: "Scan barcode" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Snap barcode" }),
-  ).toBeEnabled();
-  await page.screenshot({ path: "../docs/screenshots/barcode-camera.png" });
-  await page.getByRole("button", { name: "Snap barcode" }).click();
-  await expect(page.getByLabel("Review barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
-  expect(
-    await page.evaluate(() =>
-      (
-        window as unknown as { cameraTracks: MediaStreamTrack[] }
-      ).cameraTracks.every((track) => track.readyState === "ended"),
-    ),
-  ).toBe(true);
-  await page.screenshot({ path: "../docs/screenshots/barcode-review.png" });
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
+  await expectCameraState(page, "ended");
   await page.getByRole("button", { name: "Use barcode" }).click();
-  await expect(page.getByLabel("Item barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
+  await expect(
+    page.getByLabel("Item barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
   const saved = page.waitForRequest(
     (request) =>
       request.method() === "POST" && request.url().endsWith("/items"),
@@ -116,7 +177,7 @@ test("snap real barcode pixels, confirm, and save the exact string", async ({
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("photo fallback, invalid length, exact lookup and unknown barcode", async ({
+test("photo fallback, shorter barcode, exact lookup and unknown barcode", async ({
   page,
 }) => {
   await setup(page, "denied");
@@ -125,18 +186,15 @@ test("photo fallback, invalid length, exact lookup and unknown barcode", async (
   await expect(page.getByRole("alert")).toContainText("Camera unavailable");
   await page
     .getByLabel("Choose barcode photo")
-    .setInputFiles(
-      new URL("./fixtures/barcode-00123456789012.svg", import.meta.url)
-        .pathname,
-    );
-  await expect(page.getByRole("alert")).toContainText(
-    "does not contain exactly 16 digits",
-  );
-  await expect(page.getByRole("button", { name: "Find item" })).toBeDisabled();
+    .setInputFiles(fixturePath("barcode-00123456789012.svg"));
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue("00123456789012");
+  await expect(page.getByRole("button", { name: "Find item" })).toBeEnabled();
   await page.getByLabel("Choose barcode photo").setInputFiles(fixture);
-  await expect(page.getByLabel("Review barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
   const lookup = page.waitForRequest((request) =>
     request.url().includes(`barcode=${barcode}`),
   );
@@ -146,7 +204,9 @@ test("photo fallback, invalid length, exact lookup and unknown barcode", async (
     page.getByRole("row").filter({ hasText: barcode }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Scan barcode" }).click();
-  await page.getByLabel("Review barcode (16 digits)").fill("9999999999999999");
+  await page
+    .getByLabel("Review barcode (letters and numbers)")
+    .fill("9999999999999999");
   await page.getByRole("button", { name: "Find item" }).click();
   await expect(
     page.getByText("Barcode not assigned", { exact: true }),
@@ -163,28 +223,17 @@ test("retake and cancel stop the camera without replacing the saved barcode", as
     .getByRole("button", { name: "Scan barcode" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Snap barcode" }),
-  ).toBeEnabled();
-  await page.getByRole("button", { name: "Snap barcode" }).click();
-  await expect(page.getByLabel("Review barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
-  await page.getByRole("button", { name: "Retake photo" }).click();
-  await expect(page.getByLabel("Review barcode (16 digits)")).toHaveValue("");
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
+  await page.getByRole("button", { name: "Scan again" }).click();
   await expect(
-    page.getByRole("button", { name: "Snap barcode" }),
-  ).toBeEnabled();
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
   await page.keyboard.press("Escape");
-  await expect(page.getByLabel("Item barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
-  expect(
-    await page.evaluate(() =>
-      (
-        window as unknown as { cameraTracks: MediaStreamTrack[] }
-      ).cameraTracks.every((track) => track.readyState === "ended"),
-    ),
-  ).toBe(true);
+  await expect(
+    page.getByLabel("Item barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
+  await expectCameraState(page, "ended");
 });
 
 test("mobile scanner fits and handles an unreadable photo", async ({
@@ -193,21 +242,18 @@ test("mobile scanner fits and handles an unreadable photo", async ({
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page, "denied");
   await page.getByRole("button", { name: "Scan barcode" }).click();
-  await page
-    .getByLabel("Choose barcode photo")
-    .setInputFiles({
-      name: "blank.svg",
-      mimeType: "image/svg+xml",
-      buffer: Buffer.from(
-        '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300"><rect width="640" height="300" fill="white"/></svg>',
-      ),
-    });
+  await page.getByLabel("Choose barcode photo").setInputFiles({
+    name: "blank.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="300"><rect width="640" height="300" fill="white"/></svg>',
+    ),
+  });
   await expect(page.getByRole("alert")).toContainText("No readable barcode");
   await page.getByLabel("Choose barcode photo").setInputFiles(fixture);
-  await expect(page.getByLabel("Review barcode (16 digits)")).toHaveValue(
-    barcode,
-  );
-  await page.screenshot({ path: "../docs/screenshots/barcode-mobile.png" });
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
   expect(
     await page
       .getByRole("dialog")
@@ -216,4 +262,131 @@ test("mobile scanner fits and handles an unreadable photo", async ({
   await expect(
     page.getByRole("button", { name: "Find item" }),
   ).toBeInViewport();
+});
+
+test("manual entry and cancellation stop the camera while searching", async ({
+  page,
+}) => {
+  await setup(page, "blank");
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await expect(
+    page.getByText("Scanning automatically…", { exact: false }),
+  ).toBeVisible();
+  await page.getByLabel("Review barcode (letters and numbers)").fill(barcode);
+  await expectCameraState(page, "ended");
+  await page.getByRole("button", { name: "Retry camera" }).click();
+  await expect(
+    page.getByText("Scanning automatically…", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue("");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expectCameraState(page, "ended");
+});
+
+test("automatically captures a diagonal barcode in the camera frame", async ({
+  page,
+}) => {
+  await setup(page, "angled");
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
+});
+
+test("automatically captures shorter numeric barcodes", async ({ page }) => {
+  await setup(page, "photo", fixtureImage("barcode-00123456789012.svg"));
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue("00123456789012");
+  await expect(page.getByRole("button", { name: "Find item" })).toBeEnabled();
+});
+
+for (const [format, value] of [
+  ["code128", "00AbC123xyZ"],
+  ["code39", "SBM001234"],
+]) {
+  test(`automatically captures ${format} letters and numbers after empty frames and saves them`, async ({
+    page,
+  }) => {
+    await setup(
+      page,
+      "delayed",
+      fixtureImage(`barcode-${format}-${value}.svg`),
+    );
+    await page.getByRole("button", { name: "Add item" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Scan barcode" })
+      .click();
+    await expect(
+      page.getByText("Scanning automatically…", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByLabel("Review barcode (letters and numbers)"),
+    ).toHaveValue(value);
+    await page.getByRole("button", { name: "Use barcode" }).click();
+    await expect(
+      page.getByLabel("Item barcode (letters and numbers)"),
+    ).toHaveValue(value);
+    await page
+      .getByLabel("Item name", { exact: true })
+      .fill("Alphanumeric scanned item");
+    await page.getByLabel("SKU", { exact: true }).fill("ALPHA01");
+    await page.getByLabel("Component category").selectOption("1");
+    const saved = page.waitForRequest(
+      (request) =>
+        request.method() === "POST" && request.url().endsWith("/items"),
+    );
+    await page.getByRole("button", { name: "Save item" }).click();
+    expect((await saved).postDataJSON().barcode).toBe(value);
+  });
+}
+
+test("alphanumeric photo lookup preserves letter case and leading zeroes", async ({
+  page,
+}) => {
+  await setup(page, "denied");
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await page
+    .getByLabel("Choose barcode photo")
+    .setInputFiles(fixturePath("barcode-code128-00AbC123xyZ.svg"));
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue("00AbC123xyZ");
+  const lookup = page.waitForRequest(
+    (request) =>
+      new URL(request.url()).searchParams.get("barcode") === "00AbC123xyZ",
+  );
+  await page.getByRole("button", { name: "Find item" }).click();
+  await lookup;
+});
+
+test("reads a barcode photo with a transparent background", async ({
+  page,
+}) => {
+  await setup(page, "denied");
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await page.getByLabel("Choose barcode photo").setInputFiles({
+    name: "transparent-barcode.svg",
+    mimeType: "image/svg+xml",
+    buffer: Buffer.from(
+      fs.readFileSync(fixture, "utf8").replace('fill="white"', 'fill="none"'),
+    ),
+  });
+  await expect(
+    page.getByLabel("Review barcode (letters and numbers)"),
+  ).toHaveValue(barcode);
+});
+
+test("invalid decoded characters stay visible and do not stop live scanning", async ({
+  page,
+}) => {
+  await setup(page, "photo", fixtureImage("barcode-code128-ABC-123.svg"));
+  await page.getByRole("button", { name: "Scan barcode" }).click();
+  await expect(page.getByRole("alert")).toContainText('Detected "ABC-123"');
+  await expect(page.getByRole("button", { name: "Find item" })).toBeDisabled();
+  await expectCameraState(page, "live");
 });
