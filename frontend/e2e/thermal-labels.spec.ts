@@ -122,16 +122,17 @@ async function expectPdfSize(
   }
 }
 
-test("XP-460B defaults to 50 × 30 mm and prints one readable barcode per sticker", async ({
+test("XP-460B defaults to 30 × 30 mm and prints one readable code per sticker", async ({
   page,
   context,
 }) => {
   const barcode = "SBM-P-00000001";
   const dialog = await openLabels(page, barcode);
-  await expect(dialog.getByLabel("Sticker size")).toHaveValue("50x30");
+  await expect(dialog.getByLabel("Sticker size")).toHaveValue("30x30");
   await dialog.getByLabel("Number of stickers").fill("3");
   const popup = await printLabels(page, context, 3);
-  await expectPdfSize(popup, 50, 30, 3);
+  await expect(popup.locator(".qr-label")).toHaveCount(3);
+  await expectPdfSize(popup, 30, 30, 3);
   expect(await decodePrintedLabel(page, popup)).toBe(barcode);
   await popup.close();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -171,21 +172,32 @@ test("small stock uses QR when a linear barcode would print too thin", async ({
   expect(await decodePrintedLabel(page, popup)).toBe(barcode);
 });
 
-test("individual serials remain readable on smaller stock", async ({
+test("individual serials remain readable on 30 × 30 mm stock", async ({
   page,
   context,
 }) => {
   const serial = "屏幕-1234567890123-2";
   const dialog = await openLabels(page, "SBM-P-00000001", serial);
-  await dialog.getByLabel("Sticker size").selectOption("50x30");
   await dialog.getByLabel("Label type").selectOption("units");
   await dialog.getByLabel(`Print ${serial}`, { exact: true }).check();
   const popup = await printLabels(page, context, 1);
   await expect(popup.locator(".label-product-code")).toHaveText(
     "Product: SBM-P-00000001",
   );
-  await expectPdfSize(popup, 50, 30, 1);
+  await expectPdfSize(popup, 30, 30, 1);
   expect(await decodePrintedLabel(page, popup)).toBe(serial);
+});
+
+test("short identifiers keep a readable linear barcode on 30 × 30 mm stock", async ({
+  page,
+  context,
+}) => {
+  const barcode = "123456";
+  await openLabels(page, barcode);
+  const popup = await printLabels(page, context, 1);
+  await expect(popup.locator('img[alt^="Code128:"]')).toHaveCount(1);
+  await expectPdfSize(popup, 30, 30, 1);
+  expect(await decodePrintedLabel(page, popup)).toBe(barcode);
 });
 
 test("custom stock uses the measured width and feed length without rotation", async ({

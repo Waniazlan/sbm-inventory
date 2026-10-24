@@ -75,8 +75,8 @@ function StickerPreview({
 export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
   const [mode, setMode] = useState("product");
   const [copies, setCopies] = useState(1);
-  const [size, setSize] = useState("50x30");
-  const [customWidth, setCustomWidth] = useState("50");
+  const [size, setSize] = useState("30x30");
+  const [customWidth, setCustomWidth] = useState("30");
   const [customHeight, setCustomHeight] = useState("30");
   const [page, setPage] = useState(1);
   const [state, setState] = useState("available");
@@ -182,6 +182,7 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
           </Field>
           <Field label="Sticker size (one label)">
             <select value={size} onChange={(e) => setSize(e.target.value)}>
+              <option value="30x30">30 × 30 mm</option>
               <option value="50x30">50 × 30 mm</option>
               <option value="60x40">60 × 40 mm</option>
               <option value="80x50">80 × 50 mm</option>
