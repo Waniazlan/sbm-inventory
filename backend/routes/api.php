@@ -21,6 +21,7 @@ Route::prefix('v1')->group(function () {
         Route::get('items', [CatalogueController::class, 'index']);
         Route::get('items/options', [CatalogueController::class, 'options']);
         Route::get('items/{item}', [CatalogueController::class, 'show'])->whereNumber('item');
+        Route::get('items/{item}/units', [CatalogueController::class, 'units'])->whereNumber('item');
         Route::get('movements', [StockController::class, 'index']);
         Route::post('movements', [StockController::class, 'post']);
         Route::get('repair-jobs', [CatalogueController::class, 'jobs']);
@@ -28,6 +29,7 @@ Route::prefix('v1')->group(function () {
             Route::post('settings/login-background', [LoginBackgroundController::class, 'store']);
             Route::delete('settings/login-background', [LoginBackgroundController::class, 'destroy']);
             Route::post('items', [CatalogueController::class, 'save']);
+            Route::post('items/generate-barcode', [CatalogueController::class, 'generateBarcode']);
             Route::put('items/{item}', [CatalogueController::class, 'save'])->whereNumber('item');
             Route::post('metadata/{kind}', [CatalogueController::class, 'createMetadata']);
             Route::get('users', [CatalogueController::class, 'users']);

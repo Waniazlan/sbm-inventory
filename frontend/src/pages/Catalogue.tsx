@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Camera, Plus, Search } from "lucide-react";
 import { money, type Item, type Page } from "../api";
 
+import { ItemLabels } from "../components/ItemLabels";
 import { ItemForm } from "../components/ItemForm";
 import { BarcodeScanner } from "../components/BarcodeScanner";
 import {
@@ -18,6 +19,7 @@ import { StockForm } from "../components/StockForm";
 import { useApp, useLoad } from "../hooks";
 export function Catalogue({ low = false }: { low?: boolean }) {
   const { user, meta } = useApp();
+  const [labels, setLabels] = useState<Item | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [search, setSearch] = useState(""),
@@ -61,7 +63,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             <Search size={18} />
             <input
               aria-label="Search catalogue"
-              placeholder="Search barcode, name, SKU, brand, model or supplier…"
+              placeholder="Search barcode, serial, name, SKU, brand, model or supplier…"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -107,8 +109,8 @@ export function Catalogue({ low = false }: { low?: boolean }) {
         {scannedBarcode && (
           <div className="barcode-lookup" role="status">
             <span>
-              Exact barcode: <strong>{scannedBarcode}</strong> · Searching all
-              items
+              Exact barcode / serial: <strong>{scannedBarcode}</strong> ·
+              Searching all items
             </span>
             <Button
               variant="quiet"
@@ -171,6 +173,9 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                       <td>{money(i.price)}</td>
                       <td>
                         <div className="row-actions">
+                          <Button variant="quiet" onClick={() => setLabels(i)}>
+                            Labels &amp; serials
+                          </Button>
                           {user.role === "admin" ? (
                             <>
                               <Button
@@ -226,6 +231,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
           <Pager page={q.data} setPage={setPage} />
         </Status>
       </section>
+      {labels && <ItemLabels item={labels} close={() => setLabels(null)} />}
       {scanning && (
         <BarcodeScanner
           lookup

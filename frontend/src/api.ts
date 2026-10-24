@@ -31,6 +31,7 @@ export type Item = {
   id: number;
   sku: string;
   barcode: string | null;
+  serial_tracking: boolean;
   name: string;
   category_id: number;
   supplier_id: number | null;
@@ -50,7 +51,14 @@ export type Item = {
   active: boolean;
   notes: string | null;
 };
+export type ItemUnit = {
+  id: number;
+  item_id: number;
+  serial_number: string;
+  in_stock: boolean;
+};
 export type Movement = {
+  serials?: string | null;
   id: number;
   item: { id: number; sku: string; name: string };
   type: string;

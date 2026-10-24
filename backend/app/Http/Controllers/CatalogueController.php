@@ -4,11 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Item;
+use App\Models\ItemUnit;
 use App\Models\PhoneModel;
 use App\Models\RepairJob;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\UnitSerials;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -24,14 +26,14 @@ class CatalogueController
         $r->validate(['search' => 'nullable|string|max:200', 'barcode' => ['nullable', 'string', self::BARCODE_FORMAT_RULE], 'category_id' => 'nullable|integer', 'supplier_id' => 'nullable|integer']);
         $q = Item::with(['category', 'supplier', 'phoneModels']);
         if ($r->filled('barcode')) {
-            $q->where('barcode', $r->query('barcode'));
+            $q->where(fn ($q) => $q->where('barcode', $r->query('barcode'))->orWhereIn('id', ItemUnit::where('serial_number', $r->query('barcode'))->select('item_id')));
         }
         if ($s = $r->query('search')) {
             $q->where(function ($q) use ($s) {
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $s).'%';
                 foreach (['sku', 'barcode', 'name', 'brand', 'part_number'] as $c) {
                     $q->orWhere($c, 'ilike', $like);
-                }$q->orWhereHas('phoneModels', fn ($q) => $q->where('brand', 'ilike', $like)->orWhere('name', 'ilike', $like))->orWhereHas('supplier', fn ($q) => $q->where('name', 'ilike', $like));
+                }$q->orWhereIn('id', ItemUnit::where('serial_number', 'ilike', $like)->select('item_id'))->orWhereHas('phoneModels', fn ($q) => $q->where('brand', 'ilike', $like)->orWhere('name', 'ilike', $like))->orWhereHas('supplier', fn ($q) => $q->where('name', 'ilike', $like));
             });
         }
         if ($r->filled('category_id')) {
@@ -81,11 +83,30 @@ class CatalogueController
 
     public function options()
     {
-        return Item::where('active', true)->orderBy('name')->get(['id', 'sku', 'name', 'stock', 'unit']);
+        return Item::where('active', true)->orderBy('name')->get(['id', 'sku', 'name', 'stock', 'unit', 'serial_tracking']);
+    }
+
+    public function generateBarcode()
+    {
+        return ['barcode' => UnitSerials::barcode()];
+    }
+
+    public function units(Request $r, Item $item)
+    {
+        $r->validate(['state' => 'nullable|in:available,issued', 'search' => 'nullable|string|max:120']);
+
+        return ItemUnit::where('item_id', $item->id)
+            ->when($r->filled('state'), fn ($q) => $q->where('in_stock', $r->input('state') === 'available'))
+            ->when($r->filled('search'), fn ($q) => $q->where('serial_number', 'ilike', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $r->input('search')).'%'))
+            ->orderByDesc('id')->paginate(50);
     }
 
     public function save(Request $r, ?Item $item = null)
     {
+        // Blank barcodes on new products are allocated by the store.
+        if (! $item && ! $r->filled('barcode')) {
+            $r->merge(['barcode' => UnitSerials::barcode()]);
+        }
         $barcode = $r->validate([
             'barcode' => [
                 $item ? 'sometimes' : 'required',
@@ -101,20 +122,39 @@ class CatalogueController
         // SKUs are assigned on creation and cannot be changed through the API.
         $d = $r->validate(['name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'required|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);
 
-        $d = array_merge($d, $barcode);
+        $d = array_merge($d, $barcode, $r->validate(['serial_tracking' => 'sometimes|boolean']));
 
         try {
             return DB::transaction(function () use ($d, $item) {
                 $ids = $d['phone_model_ids'];
                 unset($d['phone_model_ids']);
                 $item = $item?->exists ? Item::whereKey($item->id)->lockForUpdate()->firstOrFail() : null;
+                if ($d['barcode'] ?? null) {
+                    DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['inventory:identifier:'.$d['barcode']]);
+                    if (ItemUnit::where('serial_number', $d['barcode'])->exists()) {
+                        throw ValidationException::withMessages(['barcode' => 'This value is already assigned to an individual unit serial.']);
+                    }
+                }
                 $before = $item?->load('phoneModels')->toArray();
+                if ($item?->serial_tracking && isset($d['serial_tracking']) && ! $d['serial_tracking']) {
+                    throw ValidationException::withMessages(['serial_tracking' => 'Serial tracking cannot be disabled after it has been enabled.']);
+                }
+                $enableSerials = ($d['serial_tracking'] ?? false) && ! $item?->serial_tracking;
+                if ($enableSerials && ($item?->stock ?? 0) > 1000) {
+                    throw ValidationException::withMessages(['serial_tracking' => 'Enable tracking for products with at most 1,000 existing units.']);
+                }
                 if ($item) {
                     $item->update($d);
                 } else {
                     $item = Item::create($d);
                     $d['sku'] = $item->sku;
-                }$item->phoneModels()->sync($ids);
+                }
+                if ($enableSerials) {
+                    for ($n = 0; $n < $item->stock; $n++) {
+                        UnitSerials::create($item);
+                    }
+                }
+                $item->phoneModels()->sync($ids);
                 Audit::record($before ? 'item.updated' : 'item.created', (string) $item->id, ['before' => $before, 'after' => $d, 'phone_model_ids' => $ids]);
 
                 return $item->load(['category', 'supplier', 'phoneModels']);

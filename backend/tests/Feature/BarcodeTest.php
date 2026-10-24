@@ -35,13 +35,14 @@ class BarcodeTest extends TestCase
         $this->putJson('/api/v1/items/'.$id, array_replace($this->payload, ['barcode' => null]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
     }
 
-    public function test_new_items_require_a_printable_barcode_string(): void
+    public function test_supplied_barcodes_must_be_printable_and_blank_new_barcodes_are_generated(): void
     {
-        foreach ([null, '', '   ', str_repeat('A', 501), "ABC\n123", "ABC\t123", "ABC\x00123", "ABC\x7F123", "ABC\u{0085}123", 1234567890123456] as $barcode) {
+        foreach ([str_repeat('A', 501), "ABC\n123", "ABC\t123", "ABC\x00123", "ABC\x7F123", "ABC\u{0085}123", 1234567890123456] as $barcode) {
             $this->postJson('/api/v1/items', array_replace($this->payload, ['barcode' => $barcode]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
         }
         unset($this->payload['barcode']);
-        $this->postJson('/api/v1/items', $this->payload)->assertUnprocessable()->assertJsonValidationErrors('barcode');
+        $barcode = $this->postJson('/api/v1/items', $this->payload)->assertCreated()->json('barcode');
+        $this->assertMatchesRegularExpression('/^SBM-P-[0-9]{8,}$/', $barcode);
     }
 
     public function test_alphanumeric_and_variable_length_barcodes_can_be_saved_updated_and_found(): void

@@ -44,6 +44,7 @@ function SingleStockForm({
     [quantity, setQuantity] = useState("1"),
     [count, setCount] = useState("0"),
     [approval, setApproval] = useState(""),
+    [serials, setSerials] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [uncertain, setUncertain] = useState(false);
@@ -76,6 +77,7 @@ function SingleStockForm({
       reason,
       reference: reference || null,
       approval_note: approval || null,
+      serials: serials || null,
     };
     snapshot.current = payload;
     try {
@@ -216,6 +218,21 @@ function SingleStockForm({
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
               />
+            </Field>
+          )}
+          {kind !== "reversal" && (
+            <Field label="Unit serial numbers" wide>
+              <textarea
+                maxLength={130000}
+                value={serials}
+                onChange={(e) => setSerials(e.target.value)}
+                placeholder="For tracked items, enter one serial per issued unit, one per line."
+              />
+              <small>
+                Required for tracked stock leaving the store. For a count
+                increase, leave blank to generate new serials. Available serials
+                are listed under the item's Labels &amp; serials.
+              </small>
             </Field>
           )}
           <Field label="Reason" wide>

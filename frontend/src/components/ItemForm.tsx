@@ -30,6 +30,7 @@ export function ItemForm({
     const text = (k: string) => String(form.get(k) || "");
     const d = {
       barcode: barcode || null,
+      serial_tracking: form.get("serial_tracking") === "on",
       name: text("name"),
       category_id: Number(text("category_id")),
       supplier_id: text("supplier_id") ? Number(text("supplier_id")) : null,
@@ -93,20 +94,20 @@ export function ItemForm({
                 <input value={item.sku} readOnly />
               </Field>
             )}
-            <div className="barcode-field wide">
+            <div className="barcode-field item-barcode-field wide">
               <Field label="Item barcode or QR value">
                 <input
                   name="barcode"
                   value={barcode}
                   onChange={(e) => setBarcode(e.target.value)}
-                  required={!item || !!item.barcode}
+                  required={!!item?.barcode}
                   pattern={BARCODE_PATTERN}
                   maxLength={BARCODE_MAX_LENGTH}
                   inputMode="text"
                   autoCapitalize="off"
                   spellCheck={false}
                   autoComplete="off"
-                  placeholder="Scan a barcode or QR code, or enter its value"
+                  placeholder="Leave blank for an automatic store barcode"
                   title="Enter 1–500 characters without line breaks or control characters"
                 />
               </Field>
@@ -117,7 +118,49 @@ export function ItemForm({
               >
                 <Camera size={17} /> Scan barcode
               </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const { data } = await api.post<{ barcode: string }>(
+                      "/items/generate-barcode",
+                    );
+                    setBarcode(data.barcode);
+                  } catch (e) {
+                    setError(errorText(e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Generate store barcode
+              </Button>
             </div>
+            <p className="wide form-help">
+              The product barcode is shared by every unit of this item. A blank
+              barcode is generated when a new item is saved.
+            </p>
+            <label className="check wide">
+              <input
+                name="serial_tracking"
+                type="checkbox"
+                defaultChecked={item?.serial_tracking ?? false}
+                disabled={item?.serial_tracking}
+              />
+              Track individual serial numbers
+            </label>
+            {item?.serial_tracking && (
+              <input type="hidden" name="serial_tracking" value="on" />
+            )}
+            <p className="wide form-help">
+              Each physical unit gets a unique serial. Enter your own serials
+              when receiving stock, or let the store generate them. Enabling
+              this also generates serials for existing stock (up to 1,000 units)
+              and cannot be undone.
+            </p>
             <Field label="Component category">
               <select
                 name="category_id"

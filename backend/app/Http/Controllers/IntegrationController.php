@@ -11,7 +11,7 @@ class IntegrationController
 {
     private function product(Item $i)
     {
-        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'stock' => $i->stock, 'compatibility' => $i->phoneModels];
+        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'stock' => $i->stock, 'barcode' => $i->barcode, 'serial_tracking' => $i->serial_tracking, 'compatibility' => $i->phoneModels];
     }
 
     public function products(Request $r)
@@ -47,7 +47,7 @@ class IntegrationController
     {
         $source = $r->attributes->get('source');
         $r->merge(['request_key' => $r->header('Idempotency-Key')]);
-        $rules = ['request_key' => 'required|string|max:150', 'reference' => 'required|string|max:120', 'actor_reference' => 'required|string|max:150', 'items' => 'required|array|min:1|max:100', 'items.*.inventory_item_id' => 'required|integer|exists:items,id', 'items.*.quantity' => 'required|integer|min:1|max:100000000', 'items.*.line_id' => 'required|string|max:120|distinct', 'reason' => 'required|string|min:3|max:500'];
+        $rules = ['request_key' => 'required|string|max:150', 'reference' => 'required|string|max:120', 'actor_reference' => 'required|string|max:150', 'items' => 'required|array|min:1|max:100', 'items.*.inventory_item_id' => 'required|integer|exists:items,id', 'items.*.quantity' => 'required|integer|min:1|max:100000000', 'items.*.serials' => 'nullable|string|max:130000', 'items.*.line_id' => 'required|string|max:120|distinct', 'reason' => 'required|string|min:3|max:500'];
         if ($source === 'sales' && $direction === 'out') {
             $rules['payment_status'] = 'required|in:paid';
             $rules['finalized'] = 'required|accepted';
@@ -60,7 +60,7 @@ class IntegrationController
         }
         $d = $r->validate($rules);
         $d['kind'] = $source === 'repair' ? 'repair_usage' : ($direction === 'out' ? 'sale' : 'return');
-        $d['items'] = array_map(fn ($i) => ['item_id' => (int) $i['inventory_item_id'], 'quantity' => (int) $i['quantity'], 'line_id' => $i['line_id']], $d['items']);
+        $d['items'] = array_map(fn ($i) => ['item_id' => (int) $i['inventory_item_id'], 'quantity' => (int) $i['quantity'], 'line_id' => $i['line_id']] + (array_key_exists('serials', $i) ? ['serials' => $i['serials']] : []), $d['items']);
 
         return $ledger->post($d, $source);
     }

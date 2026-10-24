@@ -548,7 +548,7 @@ test("serial scanner cancellation, duplicates and length limit preserve receipt 
     .click();
   await expect(receipt.getByRole("alert")).toContainText("already listed");
   await expect(details).toHaveValue("ABC-123");
-  const existing = "S".repeat(1995);
+  const existing = "S".repeat(129995);
   await details.fill(existing);
   await receipt
     .getByRole("button", { name: "Scan serial", exact: true })
@@ -559,7 +559,7 @@ test("serial scanner cancellation, duplicates and length limit preserve receipt 
   await scanner
     .getByRole("button", { name: "Use serial number", exact: true })
     .click();
-  await expect(receipt.getByRole("alert")).toContainText("2,000 characters");
+  await expect(receipt.getByRole("alert")).toContainText("130,000 characters");
   await expect(details).toHaveValue(existing);
   expect(
     await receipt.evaluate(

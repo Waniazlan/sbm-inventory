@@ -1374,3 +1374,121 @@ dialog textarea:focus {
     transition: none;
   }
 }
+
+/* Product and individual unit sticker printing. */
+.form-help {
+  color: var(--muted, #65736e);
+  font-size: 0.85rem;
+  margin: 0 0 12px;
+}
+.item-labels-dialog {
+  width: min(920px, calc(100vw - 24px));
+}
+.labels-body {
+  padding: 20px 24px;
+}
+.labels-body .form-grid {
+  margin-bottom: 16px;
+}
+.label-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px;
+  margin-top: 16px;
+  background: #f1f4f2;
+  max-height: 430px;
+  overflow: auto;
+}
+.barcode-sticker {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: var(--sticker-width);
+  height: var(--sticker-height);
+  padding: 2mm;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 1px 5px #0002;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+.barcode-sticker strong {
+  font-size: 9pt;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.barcode-sticker span {
+  font-size: 7pt;
+}
+.barcode-sticker img {
+  width: 100%;
+  height: calc(var(--sticker-height) - 16mm);
+  object-fit: contain;
+}
+.barcode-sticker img.qr-label {
+  width: calc(var(--sticker-height) - 16mm);
+}
+.barcode-sticker .label-value {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  font-size: 6.5pt;
+}
+.barcode-sticker .label-product-code {
+  font-size: 6pt;
+}
+.unit-table {
+  max-height: 280px;
+  overflow: auto;
+}
+@media (max-width: 600px) {
+  .labels-body {
+    padding: 16px;
+  }
+  .label-preview {
+    padding: 8px;
+  }
+}
+
+.item-labels-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.item-labels-dialog > .modal-head,
+.item-labels-dialog > .modal-footer {
+  flex-shrink: 0;
+}
+.labels-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+.labels-body .form-grid {
+  padding: 0;
+}
+.labels-body .toolbar > input {
+  flex: 1;
+}
+.unit-table input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  padding: 0;
+  accent-color: var(--green);
+}
+.unit-table .barcode-number {
+  white-space: nowrap;
+}
+.item-barcode-field {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+@media (max-width: 600px) {
+  .item-barcode-field {
+    grid-template-columns: 1fr;
+  }
+}

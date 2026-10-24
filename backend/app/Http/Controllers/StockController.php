@@ -14,7 +14,7 @@ class StockController
     public function post(Request $r, Ledger $ledger)
     {
         $multiReceipt = $r->input('kind') === 'receipt' && $r->exists('items');
-        $rules = ['request_key' => 'required|uuid', 'kind' => 'required|in:receipt,manual_out,adjustment,repair_usage,reversal', 'item_id' => 'required_unless:kind,reversal|integer|exists:items,id', 'quantity' => 'required_unless:kind,adjustment,reversal|integer|min:1|max:100000000', 'reason' => 'required|string|min:3|max:500', 'reference' => 'required_if:kind,repair_usage,adjustment|nullable|string|max:120', 'counted_quantity' => 'required_if:kind,adjustment|integer|min:0|max:100000000', 'movement_id' => 'required_if:kind,reversal|integer|exists:movements,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'unit_cost' => 'nullable|integer|min:0|max:100000000', 'batch' => 'nullable|string|max:150', 'serials' => 'nullable|string|max:2000', 'approval_note' => 'nullable|string|max:1000', 'occurred_at' => 'nullable|date|before_or_equal:now'];
+        $rules = ['request_key' => 'required|uuid', 'kind' => 'required|in:receipt,manual_out,adjustment,repair_usage,reversal', 'item_id' => 'required_unless:kind,reversal|integer|exists:items,id', 'quantity' => 'required_unless:kind,adjustment,reversal|integer|min:1|max:100000000', 'reason' => 'required|string|min:3|max:500', 'reference' => 'required_if:kind,repair_usage,adjustment|nullable|string|max:120', 'counted_quantity' => 'required_if:kind,adjustment|integer|min:0|max:100000000', 'movement_id' => 'required_if:kind,reversal|integer|exists:movements,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'unit_cost' => 'nullable|integer|min:0|max:100000000', 'batch' => 'nullable|string|max:150', 'serials' => 'nullable|string|max:130000', 'approval_note' => 'nullable|string|max:1000', 'occurred_at' => 'nullable|date|before_or_equal:now'];
         if ($r->input('kind') === 'receipt') {
             $rules['reason'] = 'nullable|string|min:3|max:500';
         }
@@ -29,7 +29,7 @@ class StockController
                 'items.*.quantity' => 'required|integer|min:1|max:100000000',
                 'items.*.unit_cost' => 'nullable|integer|min:0|max:100000000',
                 'items.*.batch' => 'nullable|string|max:150',
-                'items.*.serials' => 'nullable|string|max:2000',
+                'items.*.serials' => 'nullable|string|max:130000',
             ];
         } else {
             $rules['items'] = 'prohibited';

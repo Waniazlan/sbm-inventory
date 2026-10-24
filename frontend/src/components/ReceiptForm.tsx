@@ -6,7 +6,10 @@ import { useApp, useLoad } from "../hooks";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { Button, ErrorBox, Field, Modal } from "./shared";
 
-type ReceiptItem = Pick<Item, "id" | "sku" | "name" | "stock" | "unit">;
+type ReceiptItem = Pick<
+  Item,
+  "id" | "sku" | "name" | "stock" | "unit" | "serial_tracking"
+>;
 type ReceiptLine = {
   key: string;
   itemId: string;
@@ -70,9 +73,9 @@ export function ReceiptForm({
       line.serials +
       (line.serials && !line.serials.endsWith("\n") ? "\n" : "") +
       value;
-    if (serials.length > 2000) {
+    if (serials.length > 130000) {
       setError(
-        "Serial details can contain up to 2,000 characters per item. The scanned serial was not added.",
+        "Serial details can contain up to 130,000 characters per item. The scanned serial was not added.",
       );
       return;
     }
@@ -279,8 +282,15 @@ export function ReceiptForm({
                       <div className="barcode-field receipt-line-serials">
                         <Field label="Serial details">
                           <textarea
-                            rows={1}
-                            maxLength={2000}
+                            rows={2}
+                            placeholder={
+                              products.data?.find(
+                                (p) => p.id === Number(line.itemId),
+                              )?.serial_tracking
+                                ? "One serial per unit, one per line. Leave blank to generate."
+                                : "Optional receipt notes"
+                            }
+                            maxLength={130000}
                             autoCapitalize="off"
                             spellCheck={false}
                             value={line.serials}

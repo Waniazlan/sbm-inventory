@@ -111,7 +111,7 @@ class ReceiptTest extends TestCase
 
     public function test_invalid_rows_are_rejected_before_any_stock_changes(): void
     {
-        foreach ([[], [['item_id' => $this->lcd->id, 'quantity' => 0]], [['item_id' => $this->lcd->id, 'quantity' => 1.5]], [['item_id' => 9999999, 'quantity' => 1]], [['item_id' => $this->lcd->id, 'quantity' => 1, 'serials' => str_repeat('X', 2001)]], array_fill(0, 101, $this->payload['items'][0])] as $rows) {
+        foreach ([[], [['item_id' => $this->lcd->id, 'quantity' => 0]], [['item_id' => $this->lcd->id, 'quantity' => 1.5]], [['item_id' => 9999999, 'quantity' => 1]], [['item_id' => $this->lcd->id, 'quantity' => 1, 'serials' => str_repeat('X', 130001)]], array_fill(0, 101, $this->payload['items'][0])] as $rows) {
             $this->postJson('/api/v1/movements', array_replace($this->payload, ['items' => $rows]))->assertUnprocessable();
         }
         $this->assertSame(0, Movement::count());

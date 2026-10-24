@@ -16,7 +16,7 @@ Use persistent PostgreSQL storage for ongoing work. The original development clu
 | Screen | Features |
 | --- | --- |
 | Overview | Live stock counts, standard-cost value, low-stock attention list, recent movements |
-| Item catalogue | Unique SKU and barcode/QR value, camera/photo capture and exact lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
+| Item catalogue | Automatic SKU and store barcode, printable product/unit stickers, optional individual serial tracking, camera/photo capture and exact lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
 | Receive stock | Multiple item rows with dropdown selection and add/remove controls; shared supplier/reference; quantity, cost, batch and scanned serials per item |
 | Movement ledger | Receipts, issues, counts, sales, repair usage, returns and linked reversals; search, date/type/user filters |
 | Repair parts | Administrator assigns external repair references; technicians consume parts only on their active assignments |
@@ -25,7 +25,7 @@ Use persistent PostgreSQL storage for ongoing work. The original development clu
 | Integrations | Accepted external operations and acknowledgements |
 | Settings | Categories, phone models, suppliers, staff roles/activation and immutable audit history |
 
-New items receive an automatic SKU such as `PRN-000001` when saved. SKUs stay unchanged when editing; existing SKUs are preserved. Manufacturer/supplier part numbers remain optional manual entries.
+New items receive an automatic SKU such as `PRN-000001` when saved. Leave the barcode blank for an automatic store code such as `SBM-P-00000001`, or use **Generate store barcode** to preview a new one before saving. Existing supplier barcode and QR values remain supported. SKUs stay unchanged when editing; existing SKUs are preserved. Manufacturer/supplier part numbers remain optional manual entries.
 
 Start by adding phone models and suppliers in Settings. Create items with compatibility mappings, then record receipts for opening stock. To issue or count a specific item, click its name in the catalogue and choose **Issue or adjust stock**. A technician can use **Repair parts → Record usage** after an administrator assigns a repair reference.
 
@@ -38,13 +38,26 @@ No business sample stock is seeded. Browser checks create explicitly named verif
 3. Review the decoded value and select **Use barcode**. Complete the item details and **Save item**.
 4. To find it later, select **Scan barcode** at the top of the catalogue, let the camera detect the label, then select **Find item**. Scans search all items, including inactive items, regardless of category or stock filters.
 
-The barcode belongs to a catalogue item (all stock of that item), not to each individual physical unit. New items require a unique barcode or QR value; existing items can be assigned one when available. Values accept 1–500 characters, including spaces, punctuation (such as `-`, `/` and parentheses), and non-English text. Line breaks and control characters are rejected. Leading zeroes, spaces and letter case are retained, duplicates are rejected, and assigned values cannot be cleared. A scan only fills the form; saving the item commits it.
+The barcode belongs to a catalogue item (all stock of that item), not to each individual physical unit. New items receive a unique store barcode when the barcode is blank; supplied barcode or QR values must be unique. Existing items can be assigned a barcode using **Edit → Generate store barcode**. Values accept 1–500 characters, including spaces, punctuation (such as `-`, `/` and parentheses), and non-English text. Line breaks and control characters are rejected. Leading zeroes, spaces and letter case are retained, duplicates are rejected, and assigned values cannot be cleared. A scan only fills the form; saving the item commits it.
 
 Camera access requires HTTPS or localhost. **Choose barcode photo** and manual entry are available if camera access is unavailable. Photos are decoded locally using ZXing-C++ WebAssembly and are never uploaded or stored. The decoder is bundled with the app and served from the same origin; scanning does not require a CDN. All formats supported by the reader are enabled automatically. Regression-tested formats include QR Code, Data Matrix, Aztec, PDF417, Code 128, Code 39, Code 93, EAN-13, EAN-8, UPC-A, UPC-E, ITF, Codabar, and GS1 DataBar (RSS-14). UPC-A uses its 12-digit representation and basic GS1 DataBar uses its 14-digit GTIN to match the previous scanner. This reads encoded barcode or QR content, not OCR of the printed caption. A QR code may encode a different value from the text printed underneath; review the captured value before assigning it. Decoded URLs remain plain catalogue values and are never opened automatically. Real labels should be checked on the intended phone before rollout.
 
 For a preview label, use [this sample Code 128 barcode](frontend/e2e/fixtures/barcode-0012345678901234.svg), containing `0012345678901234`. For letters and numbers, use [this mixed-case Code 128 barcode](frontend/e2e/fixtures/barcode-code128-00AbC123xyZ.svg), containing `00AbC123xyZ`. Additional [barcode fixtures](frontend/e2e/fixtures/product-barcodes.json) exercise the supported 2D and linear formats. Automated browser tests use real encoded images with a simulated camera and mocked API; they cover decoding, symbols and spaces, confirmation, save, exact lookup, scanning again, cancellation, permission denial, unreadable images, and mobile layout.
 
 Existing installations must run `cd backend && php artisan migrate` to widen the barcode column and update its format constraint before saving barcode or QR values containing punctuation or more than 100 characters.
+
+## Product stickers and individual unit serials
+
+A product barcode identifies the type of part: all iPhone LCDs of the same catalogue item share it. A unit serial identifies one physical LCD. Enable **Track individual serial numbers** when adding or editing the product. Tracking cannot later be disabled. Enabling it for an existing product generates serials for its current stock (up to 1,000 units); historical receipt notes are preserved and are not converted into unit records.
+
+1. Receive stock. Enter one custom serial per physical unit, one per line, or leave Serial details blank to generate unique serials such as `SN-0000000001`. If any serials are supplied, their count must match the received quantity. Serial numbers are unique across this inventory installation, preserve case and leading zeroes, and accept up to 120 printable characters. Leading/trailing whitespace is trimmed.
+2. Open **Item catalogue → Labels & serials**. Choose **Product barcode** for identical product stickers, or **Individual unit serials** to select specific units. Search and filter units by in-stock/issued status; selections can span pages (up to 100 stickers per print job).
+3. Choose 50 × 30, 60 × 40, or 80 × 50 mm sticker stock and print at 100% scale, zero margins, with browser headers/footers disabled. Printing opens a separate label document with one sticker per page. Match the printer paper size to the selected size. The system print dialog also supports Save as PDF. Short ASCII identifiers use Code 128; long or Unicode values use QR to fit the sticker. Unit stickers encode the serial and also show the product barcode as text.
+4. For tracked stock issues, repair usage, or a downward physical-count adjustment, enter the exact serials leaving stock in **Unit serial numbers**. An upward count generates new serials when blank. Reversals restore the same units; later movements must be reversed first. Receipts/count increases support up to 1,000 tracked units per line.
+
+Both the catalogue search and exact barcode scan can find a product by a unit serial. Posted movement records retain the serials used. External sales/repair clients must send `items[].serials` as one serial per line for tracked products. Sales returns must identify units from the original sale. Product API responses include `barcode` and `serial_tracking`; serials can be read through authenticated `GET /api/v1/items/{id}/units` with `state=available|issued`, `search`, and pagination. Existing clients that only send quantities can continue handling untracked products.
+
+Run `cd backend && php artisan migrate` before using this feature on another installation. Sticker appearance and encoded values are checked in browser/PDF tests; a physical printer and scanner should be checked with the intended sticker stock.
 
 ## Business rules
 
@@ -56,7 +69,7 @@ Existing installations must run `cd backend && php artisan migrate` to widen the
 - Money uses integer MYR sen. Valuation is **current standard cost × on-hand quantity**, not FIFO or weighted average. Receipt costs are retained separately and do not silently change standard cost.
 - UTC storage; display and report date boundaries use `SHOP_TIMEZONE` (Asia/Kuala_Lumpur by default).
 - One inventory location per installation. Portal branch selection is not an inventory permission or tenant boundary.
-- Batch/serial fields are receipt annotations, not serial-by-serial stock tracking. In Receive stock, add items with **+ Add item** and remove rows with the minus control. Supplier and source reference apply to the whole receipt. The ledger reason defaults automatically to "Stock received from supplier"; each item has its own quantity, cost, batch and serial details. All rows post together as one operation, and a failed row rolls back the entire receipt. **Scan serial** reads a barcode or QR code using the camera or a photo. Confirm each scan to append it on a new line in Serial details; duplicate scans in the same receipt and values exceeding the 2,000-character limit per item are rejected. Manual entry remains available.
+- Batch fields and serial details on products without serial tracking remain receipt annotations. For products with **Track individual serial numbers** enabled, serial details register individual physical units. In Receive stock, add items with **+ Add item** and remove rows with the minus control. Supplier and source reference apply to the whole receipt. The ledger reason defaults automatically to "Stock received from supplier"; each item has its own quantity, cost, batch and serial details. All rows post together as one operation, and a failed row rolls back the entire receipt. **Scan serial** reads a barcode or QR code using the camera or a photo. Confirm each scan to append it on a new line in Serial details; duplicate scans in the same receipt and values exceeding the 130,000-character limit per item are rejected. Manual entry remains available.
 
 ## Installation
 
