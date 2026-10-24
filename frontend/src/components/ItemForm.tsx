@@ -155,12 +155,6 @@ export function ItemForm({
             {item?.serial_tracking && (
               <input type="hidden" name="serial_tracking" value="on" />
             )}
-            <p className="wide form-help">
-              Each physical unit gets a unique serial. Enter your own serials
-              when receiving stock, or let the store generate them. Enabling
-              this also generates serials for existing stock (up to 1,000 units)
-              and cannot be undone.
-            </p>
             <Field label="Component category">
               <select
                 name="category_id"

@@ -56,6 +56,7 @@ test("store barcode, individual serials, printable stickers and exact serial loo
   try {
     await row.getByRole("button", { name: "Labels & serials" }).click();
     await expect(dialog.locator(".barcode-sticker img")).toHaveCount(1);
+    await dialog.getByLabel("Sticker size").selectOption("50x30");
     // Decode the actual rendered label image using the application's scanner.
     const decodePreview = (index = 0) =>
       page.evaluate(async (index) => {

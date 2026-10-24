@@ -1,0 +1,211 @@
+import { test, expect, type Page, type BrowserContext } from "@playwright/test";
+
+// Screenshots reproduce the printer's 203 DPI output, rather than testing
+// only the higher quality source SVG. All inventory responses are isolated.
+test.use({ deviceScaleFactor: 203 / 96 });
+
+async function openLabels(page: Page, barcode: string, serial?: string) {
+  const item = {
+    id: 1,
+    sku: "PRN-000001",
+    barcode,
+    name: "Replacement LCD screen",
+    category_id: 1,
+    category: { id: 1, name: "LCD" },
+    supplier: null,
+    phone_models: [],
+    unit: "piece",
+    cost: 1200,
+    price: 2500,
+    stock: 1,
+    minimum_stock: 0,
+    active: true,
+    serial_tracking: !!serial,
+  };
+  await page.route("**/api/v1/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() !== "GET") return route.abort();
+    const body = path.endsWith("/auth/me")
+      ? { id: 1, name: "Label admin", role: "admin", active: true }
+      : path.endsWith("/metadata")
+        ? { categories: [item.category], suppliers: [], phone_models: [] }
+        : path.endsWith("/items/1/units")
+          ? {
+              data: serial
+                ? [{ id: 1, serial_number: serial, in_stock: true }]
+                : [],
+              total: serial ? 1 : 0,
+              current_page: 1,
+              last_page: 1,
+            }
+          : path.endsWith("/items")
+            ? { data: [item], total: 1, current_page: 1, last_page: 1 }
+            : null;
+    if (!body) return route.abort();
+    await route.fulfill({ json: body });
+  });
+  await page.goto("/catalogue");
+  await page.getByRole("button", { name: "Labels & serials" }).click();
+  await page.evaluate(() => {
+    const open = window.open.bind(window);
+    window.open = (...args) => {
+      const popup = open(...args);
+      if (popup)
+        popup.print = () => {
+          popup.document.body.dataset.printed = "true";
+        };
+      return popup;
+    };
+  });
+  return page.getByRole("dialog");
+}
+
+async function printLabels(page: Page, context: BrowserContext, count: number) {
+  await expect(page.locator('.barcode-sticker[data-ready="true"]')).toHaveCount(
+    count,
+  );
+  const opening = context.waitForEvent("page");
+  await page.getByRole("button", { name: `Print ${count} sticker(s)` }).click();
+  const popup = await opening;
+  await expect(popup.locator("body")).toHaveAttribute("data-printed", "true");
+  await popup.emulateMedia({ media: "print" });
+  await expect(popup.locator(".print-controls")).toBeHidden();
+  return popup;
+}
+
+async function decodePrintedLabel(page: Page, popup: Page) {
+  const sticker = popup.locator(".barcode-sticker").first();
+  const clipped = await sticker.evaluate((element) =>
+    Array.from(element.children).some((child) => {
+      const rect = child.getBoundingClientRect();
+      const label = element.getBoundingClientRect();
+      return (
+        rect.left < label.left ||
+        rect.right > label.right ||
+        rect.top < label.top ||
+        rect.bottom > label.bottom
+      );
+    }),
+  );
+  expect(clipped).toBe(false);
+  const pixels = await sticker.screenshot({ scale: "device" });
+  return page.evaluate(async (base64) => {
+    const image = new Image();
+    image.src = `data:image/png;base64,${base64}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    canvas.getContext("2d")!.drawImage(image, 0, 0);
+    // @ts-expect-error Vite serves this browser module during the test.
+    const { decodeBarcode } = await import("/src/lib/barcode.ts");
+    return decodeBarcode(canvas);
+  }, pixels.toString("base64"));
+}
+
+async function expectPdfSize(
+  popup: Page,
+  widthMm: number,
+  heightMm: number,
+  pages: number,
+) {
+  const pdf = await popup.pdf({ preferCSSPageSize: true });
+  const content = pdf.toString("latin1");
+  expect(content.match(/\/Type\s*\/Page\b/g)).toHaveLength(pages);
+  const boxes = [
+    ...content.matchAll(/\/MediaBox\s*\[0 0 ([\d.]+) ([\d.]+)\]/g),
+  ];
+  expect(boxes).toHaveLength(pages);
+  for (const box of boxes) {
+    expect(Math.abs(Number(box[1]) - (widthMm * 72) / 25.4)).toBeLessThan(1);
+    expect(Math.abs(Number(box[2]) - (heightMm * 72) / 25.4)).toBeLessThan(1);
+  }
+}
+
+test("XP-460B defaults to 50 × 30 mm and prints one readable barcode per sticker", async ({
+  page,
+  context,
+}) => {
+  const barcode = "SBM-P-00000001";
+  const dialog = await openLabels(page, barcode);
+  await expect(dialog.getByLabel("Sticker size")).toHaveValue("50x30");
+  await dialog.getByLabel("Number of stickers").fill("3");
+  const popup = await printLabels(page, context, 3);
+  await expectPdfSize(popup, 50, 30, 3);
+  expect(await decodePrintedLabel(page, popup)).toBe(barcode);
+  await popup.close();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(
+    true,
+  );
+  await expect(
+    dialog.getByRole("button", { name: "Print 3 sticker(s)" }),
+  ).toBeInViewport();
+});
+
+test("Unicode product codes print as readable QR on 76 × 130 mm stock", async ({
+  page,
+  context,
+}) => {
+  const barcode = "配件-屏幕 (原装) / " + "LCD OP A15/A15S/A16K ".repeat(8);
+  const dialog = await openLabels(page, barcode);
+  await dialog.getByLabel("Sticker size").selectOption("76x130");
+  const popup = await printLabels(page, context, 1);
+  await expect(popup.locator(".qr-label")).toHaveCount(1);
+  await expectPdfSize(popup, 76, 130, 1);
+  expect(await decodePrintedLabel(page, popup)).toBe(barcode);
+});
+
+test("small stock uses QR when a linear barcode would print too thin", async ({
+  page,
+  context,
+}) => {
+  const barcode = "SUPPLIER-ABCDEF12345";
+  const dialog = await openLabels(page, barcode);
+  await dialog.getByLabel("Sticker size").selectOption("76x130");
+  await expect(dialog.locator('img[alt^="Code128:"]')).toHaveCount(1);
+  await dialog.getByLabel("Sticker size").selectOption("50x30");
+  const popup = await printLabels(page, context, 1);
+  await expect(popup.locator(".qr-label")).toHaveCount(1);
+  await expectPdfSize(popup, 50, 30, 1);
+  expect(await decodePrintedLabel(page, popup)).toBe(barcode);
+});
+
+test("individual serials remain readable on smaller stock", async ({
+  page,
+  context,
+}) => {
+  const serial = "屏幕-1234567890123-2";
+  const dialog = await openLabels(page, "SBM-P-00000001", serial);
+  await dialog.getByLabel("Sticker size").selectOption("50x30");
+  await dialog.getByLabel("Label type").selectOption("units");
+  await dialog.getByLabel(`Print ${serial}`, { exact: true }).check();
+  const popup = await printLabels(page, context, 1);
+  await expect(popup.locator(".label-product-code")).toHaveText(
+    "Product: SBM-P-00000001",
+  );
+  await expectPdfSize(popup, 50, 30, 1);
+  expect(await decodePrintedLabel(page, popup)).toBe(serial);
+});
+
+test("custom stock uses the measured width and feed length without rotation", async ({
+  page,
+  context,
+}) => {
+  const barcode = "SBM-P-00000001";
+  const dialog = await openLabels(page, barcode);
+  await dialog.getByLabel("Sticker size").selectOption("custom");
+  await dialog.getByLabel("Width across roll (mm)").fill("");
+  await expect(
+    dialog.getByRole("button", { name: "Print 1 sticker(s)" }),
+  ).toBeDisabled();
+  await dialog.getByLabel("Width across roll (mm)").fill("50.5");
+  await dialog.getByLabel("Length along feed (mm)").fill("30.5");
+  const popup = await printLabels(page, context, 1);
+  await expect(popup.locator(".print-controls")).toContainText(
+    "50.5 mm across the roll × 30.5 mm along the feed",
+  );
+  await expect(popup.locator(".print-controls")).toContainText("rotation 0°");
+  await expectPdfSize(popup, 50.5, 30.5, 1);
+  expect(await decodePrintedLabel(page, popup)).toBe(barcode);
+});

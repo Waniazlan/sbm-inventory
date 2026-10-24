@@ -1,0 +1,63 @@
+/* Shared by the on-screen preview and the isolated printer document. */
+.barcode-sticker {
+  box-sizing: border-box;
+  flex-shrink: 0;
+  width: var(--sticker-width);
+  height: var(--sticker-height);
+  padding: 2mm;
+  background: #fff;
+  color: #000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5mm;
+  text-align: center;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+  break-inside: avoid;
+  break-after: page;
+}
+.barcode-sticker:last-child {
+  break-after: auto;
+}
+.barcode-sticker strong {
+  flex-shrink: 0;
+  font-size: 9pt;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.barcode-sticker span {
+  flex-shrink: 0;
+  font-size: 7pt;
+  line-height: 1.2;
+}
+.label-symbol {
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.label-symbol img {
+  display: block;
+  flex-shrink: 0;
+}
+.barcode-sticker .label-value {
+  font-family: monospace;
+  overflow-wrap: anywhere;
+  font-size: 6.5pt;
+  max-width: 100%;
+  max-height: 2.4em;
+  overflow: hidden;
+}
+.barcode-sticker .label-product-code {
+  font-size: 6pt;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

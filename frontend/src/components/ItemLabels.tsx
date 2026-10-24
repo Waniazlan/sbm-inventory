@@ -1,21 +1,35 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
 import { errorText, type Item, type ItemUnit, type Page } from "../api";
 import { useLoad } from "../hooks";
-import { labelSymbol } from "../lib/labels";
+import { labelSymbol, type LabelSymbol } from "../lib/labels";
+import "./item-labels.css";
+import stickerStyles from "./item-labels.css?inline";
 import { Button, Empty, ErrorBox, Field, Modal, Pager, Status } from "./shared";
 
 type Sticker = { value: string; serial?: string };
-function StickerPreview({ item, sticker }: { item: Item; sticker: Sticker }) {
-  const [symbol, setSymbol] = useState<{ src: string; format: string } | null>(
-    null,
-  );
+function StickerPreview({
+  item,
+  sticker,
+  width,
+  height,
+}: {
+  item: Item;
+  sticker: Sticker;
+  width: number;
+  height: number;
+}) {
+  const [symbol, setSymbol] = useState<LabelSymbol | null>(null);
   const [error, setError] = useState("");
+  const symbolHeight = Math.min(32, height - (sticker.serial ? 21 : 18));
   useEffect(() => {
     let live = true;
     setSymbol(null);
     setError("");
-    labelSymbol(sticker.value)
+    labelSymbol(sticker.value, {
+      widthMm: width - 4,
+      heightMm: symbolHeight,
+    })
       .then((value) => {
         if (live) setSymbol(value);
       })
@@ -25,20 +39,26 @@ function StickerPreview({ item, sticker }: { item: Item; sticker: Sticker }) {
     return () => {
       live = false;
     };
-  }, [sticker.value]);
+  }, [sticker.value, width, symbolHeight]);
   return (
     <article className="barcode-sticker" data-ready={!!symbol}>
       <strong>{item.name}</strong>
       <span>{item.sku}</span>
-      {symbol ? (
-        <img
-          className={symbol.format === "QRCode" ? "qr-label" : ""}
-          src={symbol.src}
-          alt={`${symbol.format}: ${sticker.value}`}
-        />
-      ) : (
-        <span>{error || "Generating barcode…"}</span>
-      )}
+      <div className="label-symbol" style={{ height: `${symbolHeight}mm` }}>
+        {symbol ? (
+          <img
+            className={symbol.format === "QRCode" ? "qr-label" : ""}
+            src={symbol.src}
+            style={{
+              width: `${symbol.widthMm}mm`,
+              height: `${symbol.heightMm}mm`,
+            }}
+            alt={`${symbol.format}: ${sticker.value}`}
+          />
+        ) : (
+          <span>{error || "Generating barcode…"}</span>
+        )}
+      </div>
       <span className="label-value">
         {sticker.serial ? "S/N: " : ""}
         {sticker.value}
@@ -56,11 +76,14 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
   const [mode, setMode] = useState("product");
   const [copies, setCopies] = useState(1);
   const [size, setSize] = useState("50x30");
+  const [customWidth, setCustomWidth] = useState("50");
+  const [customHeight, setCustomHeight] = useState("30");
   const [page, setPage] = useState(1);
   const [state, setState] = useState("available");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<ItemUnit[]>([]);
   const [error, setError] = useState("");
+  const preview = useRef<HTMLDivElement>(null);
   const units = useLoad<Page<ItemUnit>>(
     `/items/${item.id}/units?page=${page}&state=${state}&search=${encodeURIComponent(search)}`,
   );
@@ -73,10 +96,21 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
           value: unit.serial_number,
           serial: unit.serial_number,
         }));
-  const [width, height] = size.split("x").map(Number);
+  const [width, height] =
+    size === "custom"
+      ? [Number(customWidth), Number(customHeight)]
+      : size.split("x").map(Number);
+  const validSize =
+    Number.isFinite(width) &&
+    Number.isFinite(height) &&
+    width >= 20 &&
+    width <= 108 &&
+    height >= 25 &&
+    height <= 1778;
   async function print() {
     setError("");
-    const source = document.querySelector(".label-preview");
+    if (!validSize) return;
+    const source = preview.current;
     if (
       !source ||
       !stickers.length ||
@@ -92,14 +126,29 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
       return;
     }
     const doc = popup.document;
-    doc.title = `${item.sku} labels`;
+    doc.title = `${item.sku} · XP-460B · ${width} × ${height} mm`;
     const style = doc.createElement("style");
-    style.textContent = `@page { size: ${width}mm ${height}mm; margin: 0; } * { box-sizing: border-box; } body { margin: 0; font-family: Arial,sans-serif; color: #000; background: #fff; } .barcode-sticker { width: ${width}mm; height: ${height}mm; padding: 2mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; overflow: hidden; break-after: page; } .barcode-sticker:last-child { break-after: auto; } strong { font-size: 9pt; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; } span { font-size: 7pt; } img { width: 100%; height: ${height - 16}mm; object-fit: contain; } .qr-label { width: ${height - 16}mm; } .label-value { font-family: monospace; overflow-wrap: anywhere; font-size: 6.5pt; } .label-product-code { font-size: 6pt; } button { margin: 15px; padding: 10px; } @media print { button { display:none; } }`;
+    style.textContent = `
+      @page { size: ${width}mm ${height}mm; margin: 0; }
+      :root { --sticker-width: ${width}mm; --sticker-height: ${height}mm; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; color: #000; background: #fff; }
+      ${stickerStyles}
+      .print-controls { margin: 16px; font: 14px Arial, sans-serif; }
+      .print-controls button { padding: 10px; }
+      @media print { .print-controls { display: none; } }
+    `;
     doc.head.append(style);
+    const controls = doc.createElement("div");
+    controls.className = "print-controls";
+    const instructions = doc.createElement("p");
+    instructions.textContent = `Xprinter XP-460B · One sticker: ${width} mm across the roll × ${height} mm along the feed. Set the same dimensions in the driver, 100% scale, rotation 0°, no auto-rotation, margins, headers or footers. For gap labels, select gap media and calibrate the loaded roll. Use one copy in the print dialog; this document already contains ${stickers.length} label(s).`;
+    controls.append(instructions);
     const button = doc.createElement("button");
     button.textContent = "Print stickers";
     button.onclick = () => popup.print();
-    doc.body.append(button);
+    controls.append(button);
+    doc.body.append(controls);
     for (const node of source.children)
       doc.body.append(doc.importNode(node, true));
     popup.opener = null;
@@ -131,13 +180,39 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
               )}
             </select>
           </Field>
-          <Field label="Sticker size">
+          <Field label="Sticker size (one label)">
             <select value={size} onChange={(e) => setSize(e.target.value)}>
               <option value="50x30">50 × 30 mm</option>
               <option value="60x40">60 × 40 mm</option>
               <option value="80x50">80 × 50 mm</option>
+              <option value="76x130">76 × 130 mm</option>
+              <option value="custom">Custom size…</option>
             </select>
           </Field>
+          {size === "custom" && (
+            <>
+              <Field label="Width across roll (mm)">
+                <input
+                  type="number"
+                  min={20}
+                  max={108}
+                  step={0.1}
+                  value={customWidth}
+                  onChange={(e) => setCustomWidth(e.target.value)}
+                />
+              </Field>
+              <Field label="Length along feed (mm)">
+                <input
+                  type="number"
+                  min={25}
+                  max={1778}
+                  step={0.1}
+                  value={customHeight}
+                  onChange={(e) => setCustomHeight(e.target.value)}
+                />
+              </Field>
+            </>
+          )}
           {mode === "product" && (
             <Field label="Number of stickers">
               <input
@@ -157,6 +232,14 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
             </Field>
           )}
         </div>
+        <p className="form-help">
+          Measure one peel-off sticker, excluding the gaps. Width goes across
+          the roll; length follows the paper feed. Do not use the length of a
+          strip containing several stickers.
+        </p>
+        {!validSize && (
+          <ErrorBox message="Enter a width from 20 to 108 mm and a feed length from 25 to 1778 mm." />
+        )}
         {mode === "product" ? (
           <p className="form-help">
             Use the same product barcode on every unit.{" "}
@@ -266,12 +349,20 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
             </div>
           </>
         )}
-        <p className="form-help">
-          Print at 100% scale with no margins or browser headers. Match the
-          printer paper size to the selected sticker size. Save as PDF is also
-          available in the print dialog.
-        </p>
+        {validSize && (
+          <p className="form-help">
+            Xprinter XP-460B · 203 DPI. Set the printer driver paper size to{" "}
+            {width}
+            {" × "}
+            {height} mm, 100% scale, rotation 0°, no auto-rotation or margins,
+            and turn off browser headers and footers. Each page prints one
+            sticker. For gap labels, select gap media in the driver and
+            calibrate the loaded roll. Save as PDF is also available in the
+            print dialog.
+          </p>
+        )}
         <div
+          ref={preview}
           className="label-preview"
           style={
             {
@@ -280,20 +371,23 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
             } as React.CSSProperties
           }
         >
-          {stickers.map((sticker, index) => (
-            <StickerPreview
-              key={`${sticker.value}-${index}`}
-              item={item}
-              sticker={sticker}
-            />
-          ))}
+          {validSize &&
+            stickers.map((sticker, index) => (
+              <StickerPreview
+                key={`${sticker.value}-${index}-${width}x${height}`}
+                item={item}
+                sticker={sticker}
+                width={width}
+                height={height}
+              />
+            ))}
         </div>
       </div>
       <div className="modal-footer">
         <Button variant="secondary" onClick={close}>
           Close
         </Button>
-        <Button disabled={!stickers.length} onClick={print}>
+        <Button disabled={!stickers.length || !validSize} onClick={print}>
           <Printer size={17} />
           Print {stickers.length} sticker(s)
         </Button>

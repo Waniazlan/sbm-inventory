@@ -1400,47 +1400,8 @@ dialog textarea:focus {
   max-height: 430px;
   overflow: auto;
 }
-.barcode-sticker {
-  box-sizing: border-box;
-  flex-shrink: 0;
-  width: var(--sticker-width);
-  height: var(--sticker-height);
-  padding: 2mm;
-  background: #fff;
-  color: #000;
+.label-preview .barcode-sticker {
   box-shadow: 0 1px 5px #0002;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  overflow: hidden;
-}
-.barcode-sticker strong {
-  font-size: 9pt;
-  max-width: 100%;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-.barcode-sticker span {
-  font-size: 7pt;
-}
-.barcode-sticker img {
-  width: 100%;
-  height: calc(var(--sticker-height) - 16mm);
-  object-fit: contain;
-}
-.barcode-sticker img.qr-label {
-  width: calc(var(--sticker-height) - 16mm);
-}
-.barcode-sticker .label-value {
-  font-family: monospace;
-  overflow-wrap: anywhere;
-  font-size: 6.5pt;
-}
-.barcode-sticker .label-product-code {
-  font-size: 6pt;
 }
 .unit-table {
   max-height: 280px;
