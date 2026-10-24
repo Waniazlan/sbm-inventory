@@ -58,15 +58,27 @@ Point an isolated copy of the app at the restored database, run `php artisan inv
 
 ## inventory.vgadget.my — native Caddy + PHP 8.4-FPM
 
-The matching Sales deployment installer is `scripts/install-production.sh`. It uses `/var/www/sbm-inventory`, a separate FPM socket, and an additional Caddy site without replacing Main or Sales. Production selects `DO_DB_*` credentials with SSL; local/testing retains `DB_*`. The installer creates the dedicated `sbm-inventory` database and schema before migrations and seeds only categories. It preserves APP_KEY and storage, keeps the project `.env` as the protected source, and installs a minute timer for `inventory:reconcile`. Inventory posts synchronously and needs no queue worker.
+The native deployment installer is `scripts/install-production.sh`. It uses `/home/system/sbm-inventory`, a separate FPM socket, and the existing Caddy site without replacing Main or Sales. Production selects `DO_DB_*` credentials with SSL; local/testing retains `DB_*`. The installer creates the dedicated `sbm-inventory` database and schema before migrations and seeds only categories. It preserves APP_KEY and storage, keeps the project `.env` as a regular protected file, and installs a minute timer for `inventory:reconcile`. Inventory posts synchronously and needs no queue worker.
 
 ```bash
 cd /home/system/sbm-inventory
 composer install --working-dir=backend --no-dev --no-interaction --optimize-autoloader
 (cd frontend && npm ci && npm run build)
 sudo bash scripts/install-production.sh
-cd /var/www/sbm-inventory/backend
+cd /home/system/sbm-inventory/backend
 sudo -u www-data php artisan sbm:create-admin YOUR_EMAIL
 ```
 
 Set DNS for inventory.vgadget.my to this server and use Cloudflare Full (strict). Verify `https://inventory.vgadget.my/up` and login after deployment. Back up the dedicated database and protected environment. Sales integration still requires the adapter changes described in integration-contracts.md.
+
+After backend code or route changes, rebuild the route cache and gracefully reload PHP-FPM:
+
+```bash
+cd /home/system/sbm-inventory/backend
+php artisan route:cache
+sudo systemctl reload php8.4-fpm
+```
+
+This server sets `opcache.validate_timestamps=0`, so PHP-FPM continues using cached PHP code until it is reloaded. CLI route checks can pass while HTTPS requests still use old routes. The production installer already performs this reload. Verify through HTTPS after manual updates as well.
+
+For the existing server, first run `sudo bash /home/system/caddy/migrate-app-paths.sh`. It switches Main, Inventory and Sales together, preserves live storage and environment settings, and archives the old deployments after HTTPS health and frontend checks pass. The path migration does not migrate or seed databases. The installer refuses to run while Caddy still uses the legacy Inventory directory. Source ownership stays with the developer.
