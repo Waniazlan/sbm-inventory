@@ -11,6 +11,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(web: __DIR__.'/../routes/web.php', api: __DIR__.'/../routes/api.php', commands: __DIR__.'/../routes/console.php', health: '/up')
     ->withMiddleware(function (Middleware $m) {
         $m->statefulApi();
+        // Keep scanned identifiers identical when saving and doing exact lookup.
+        $m->trimStrings(except: ['barcode']);
         $m->alias(['admin' => Admin::class, 'active' => Active::class, 'integration' => Integration::class]);
     })
     ->withExceptions(function (Exceptions $e) {

@@ -14,6 +14,37 @@ class ConcurrencyTest extends TestCase
 {
     use DatabaseMigrations;
 
+    public function test_concurrent_item_creations_get_distinct_generated_skus(): void
+    {
+        $category = Category::create(['name' => 'Concurrent SKUs']);
+        $db = config('database.connections.pgsql');
+        $code = <<<'PHP'
+            require 'vendor/autoload.php';
+            $app = require 'bootstrap/app.php';
+            $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+            if (! app()->environment('testing') || Illuminate\Support\Facades\DB::connection()->getDatabaseName() !== 'sbm_inventory_test') {
+                exit(1);
+            }
+            $item = App\Models\Item::create(['name' => 'Concurrent item', 'category_id' => $argv[1]]);
+            echo $item->sku;
+            PHP;
+        $processes = [];
+        for ($i = 0; $i < 4; $i++) {
+            $process = new Process([PHP_BINARY, '-r', $code, (string) $category->id], base_path(), ['APP_ENV' => 'testing', 'DB_DATABASE' => 'sbm_inventory_test', 'DB_CONNECTION' => 'pgsql', 'DB_HOST' => $db['host'], 'DB_PORT' => (string) $db['port'], 'DB_USERNAME' => $db['username'], 'DB_PASSWORD' => $db['password'] ?? '', 'APP_KEY' => config('app.key')]);
+            $process->start();
+            $processes[] = $process;
+        }
+        $skus = [];
+        foreach ($processes as $process) {
+            $process->wait();
+            $this->assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+            $this->assertMatchesRegularExpression('/^PRN-[0-9]{6,}$/', $process->getOutput());
+            $skus[] = $process->getOutput();
+        }
+        $this->assertCount(4, array_unique($skus));
+        $this->assertSame(4, Item::count());
+    }
+
     public function test_concurrent_sales_cannot_overissue_and_duplicate_event_posts_once(): void
     {
         $category = Category::create(['name' => 'Concurrency']);

@@ -1,0 +1,72 @@
+[
+  {
+    "name": "qr-screen",
+    "format": "qrcode",
+    "value": "BMIP13(IC)INCB"
+  },
+  {
+    "name": "qr-charging",
+    "format": "qrcode",
+    "value": "CHGUI-IP14PRO"
+  },
+  {
+    "name": "qr-description",
+    "format": "qrcode",
+    "value": "LCD FULL SET (O) OP A15/A15S/A16K/C11/C12"
+  },
+  {
+    "name": "datamatrix",
+    "format": "datamatrix",
+    "value": "PART-001/A (O)"
+  },
+  {
+    "name": "aztec",
+    "format": "azteccode",
+    "value": "PART-002/A (O)"
+  },
+  {
+    "name": "pdf417",
+    "format": "pdf417",
+    "value": "PART-003/A (O)"
+  },
+  {
+    "name": "code93",
+    "format": "code93",
+    "value": "PART-004"
+  },
+  {
+    "name": "ean13",
+    "format": "ean13",
+    "value": "5901234123457"
+  },
+  {
+    "name": "ean8",
+    "format": "ean8",
+    "value": "96385074"
+  },
+  {
+    "name": "upca",
+    "format": "upca",
+    "value": "036000291452"
+  },
+  {
+    "name": "itf",
+    "format": "interleaved2of5",
+    "value": "00123456789012"
+  },
+  {
+    "name": "codabar",
+    "format": "rationalizedCodabar",
+    "value": "A123456A"
+  },
+  {
+    "name": "databar",
+    "format": "databaromni",
+    "value": "09501101530003"
+  },
+  {
+    "name": "upce",
+    "format": "upce",
+    "value": "01234565"
+  }
+]

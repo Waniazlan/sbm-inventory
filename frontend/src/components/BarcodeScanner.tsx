@@ -14,11 +14,14 @@ export function BarcodeScanner({
   close,
   onConfirm,
   lookup = false,
+  mode = "barcode",
 }: {
   close: () => void;
   onConfirm: (barcode: string) => void;
   lookup?: boolean;
+  mode?: "barcode" | "serial";
 }) {
+  const serial = mode === "serial";
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const generation = useRef(0);
@@ -64,7 +67,7 @@ export function BarcodeScanner({
           return;
         }
         setError(
-          `Detected "${result}" (${result.length} characters). Use 1–100 letters and numbers only. Keep scanning a valid item label.`,
+          `Detected "${result}" (${result.length} characters). Use up to 500 characters without line breaks or control characters. Keep scanning a valid item label.`,
         );
       } catch (error) {
         if (current !== generation.current || !stream.current) return;
@@ -180,7 +183,7 @@ export function BarcodeScanner({
       if (current !== generation.current) return;
       if (!validBarcode(result)) {
         throw new Error(
-          "This barcode must contain 1–100 letters and numbers only. Check the item label and try again.",
+          "Use 1–500 characters without line breaks or control characters. Check the item label and try again.",
         );
       }
       setValue(result);
@@ -197,15 +200,12 @@ export function BarcodeScanner({
 
   return (
     <Modal
-      title="Scan barcode"
+      className="barcode-dialog"
+      title={serial ? "Scan serial number" : "Scan barcode"}
       subtitle="Open camera → Automatic detection → Review and confirm"
       close={close}
     >
       <div className="barcode-scanner">
-        <p>
-          Keep the entire barcode inside the frame, including the blank space at
-          both ends. The barcode value is captured automatically when detected.
-        </p>
         <div className="barcode-camera">
           <video
             ref={video}
@@ -230,7 +230,7 @@ export function BarcodeScanner({
             <RotateCcw size={16} /> {preview ? "Scan again" : "Retry camera"}
           </Button>
         </div>
-        <Field label="Choose barcode photo">
+        <Field label={serial ? "Choose serial photo" : "Choose barcode photo"}>
           <input
             type="file"
             accept="image/*"
@@ -242,34 +242,36 @@ export function BarcodeScanner({
             }}
           />
         </Field>
-        <Field label="Review barcode (letters and numbers)">
-          <input
-            value={value}
-            onChange={(e) => {
-              generation.current++;
-              stopCamera();
-              setError("");
-              setValue(e.target.value);
-            }}
-            inputMode="text"
-            autoCapitalize="off"
-            spellCheck={false}
-            maxLength={BARCODE_MAX_LENGTH}
-            autoComplete="off"
-            placeholder="Or enter the barcode manually"
-            disabled={busy}
-          />
-        </Field>
+        <input
+          aria-label={
+            serial ? "Review serial number" : "Review barcode or QR value"
+          }
+          value={value}
+          onChange={(e) => {
+            generation.current++;
+            stopCamera();
+            setError("");
+            setValue(e.target.value);
+          }}
+          inputMode="text"
+          autoCapitalize="off"
+          spellCheck={false}
+          maxLength={BARCODE_MAX_LENGTH}
+          autoComplete="off"
+          placeholder={
+            serial
+              ? "Or enter the serial number manually"
+              : "Or enter the barcode manually"
+          }
+          disabled={busy}
+        />
         <p role="status">
           {validBarcode(value)
-            ? "Barcode captured. Check it against the label before confirming."
+            ? `${serial ? "Serial number" : "Barcode"} captured. Check it against the label before confirming.`
             : ready
               ? "Scanning automatically… Point the camera at a barcode."
-              : "Use 1–100 letters and numbers. Leading zeroes and letter case are kept."}
+              : "Use 1–500 characters. Spaces, punctuation, leading zeroes and letter case are kept."}
         </p>
-        <small>
-          Photos are processed on this device and are not uploaded or saved.
-        </small>
       </div>
       <div className="modal-footer">
         <Button type="button" variant="secondary" onClick={close}>
@@ -280,7 +282,7 @@ export function BarcodeScanner({
           disabled={busy || !validBarcode(value)}
           onClick={() => onConfirm(value)}
         >
-          {lookup ? "Find item" : "Use barcode"}
+          {serial ? "Use serial number" : lookup ? "Find item" : "Use barcode"}
         </Button>
       </div>
     </Modal>

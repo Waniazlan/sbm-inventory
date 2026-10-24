@@ -20,19 +20,25 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   ).toBeVisible();
   await page.getByRole("link", { name: "Item catalogue" }).click();
   await page.getByRole("button", { name: "Add item" }).click();
-  const sku = "BROWSER-" + Date.now();
   const barcode = String(Date.now()).padStart(16, "0");
   const dialog = page.getByRole("dialog");
   await dialog.getByLabel("Item name").fill("Browser verification battery");
-  await dialog.getByLabel("SKU", { exact: true }).fill(sku);
-  await dialog.getByLabel("Item barcode (16 digits)").fill(barcode);
+  await dialog.getByLabel("Item barcode or QR value").fill(barcode);
   await dialog
     .getByLabel("Component category")
     .selectOption({ label: "Battery" });
   await dialog.getByLabel("Standard cost (MYR)").fill("12.00");
   await dialog.getByLabel("Selling price (MYR)").fill("25.00");
   await dialog.getByLabel("Minimum stock").fill("2");
+  const createdResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().endsWith("/api/v1/items"),
+  );
   await dialog.getByRole("button", { name: "Save item" }).click();
+  const createdItem = await (await createdResponse).json();
+  const sku = createdItem.sku as string;
+  expect(sku).toMatch(/^PRN-\d{6,}$/);
   await expect(dialog).not.toBeVisible();
   await page.getByLabel("Search catalogue").fill(sku);
   const row = page.getByRole("row").filter({ hasText: sku });
@@ -40,10 +46,7 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await row.getByRole("button", { name: "Receive", exact: true }).click();
   await dialog.getByLabel("Quantity", { exact: true }).fill("10");
   await dialog.getByLabel("Source reference").fill(sku);
-  await dialog
-    .getByLabel("Reason", { exact: true })
-    .fill("Browser verification receipt");
-  await dialog.getByRole("button", { name: "Record movement" }).click();
+  await dialog.getByRole("button", { name: "Receive stock" }).click();
   await expect(dialog).not.toBeVisible();
   await expect(row).toContainText("10");
   await row
@@ -128,7 +131,7 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await page.getByLabel("Search movements").fill(sku);
   await page
     .getByRole("row")
-    .filter({ hasText: "Browser verification receipt" })
+    .filter({ hasText: "Stock received from supplier" })
     .getByRole("button", { name: "Reverse" })
     .click();
   await dialog

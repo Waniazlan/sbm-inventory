@@ -57,6 +57,18 @@ class InventoryTest extends TestCase
         $this->artisan('inventory:reconcile')->assertExitCode(0);
     }
 
+    public function test_receipt_preserves_scanned_serials_and_retry_does_not_duplicate_stock(): void
+    {
+        $key = (string) Str::uuid();
+        $serials = "00AbC-00001\nSN/00002(A)";
+        $payload = ['request_key' => $key, 'quantity' => 2, 'serials' => $serials];
+        $response = $this->movement($payload)->assertOk()->assertJsonPath('movements.0.balance', 2)->json();
+        $this->assertDatabaseHas('movements', ['item_id' => $this->item->id, 'serials' => $serials, 'quantity' => 2]);
+        $this->movement($payload)->assertExactJson($response);
+        $this->assertSame(2, $this->item->fresh()->stock);
+        $this->assertSame(1, Movement::count());
+    }
+
     public function test_retry_and_conflicting_payload()
     {
         $key = (string) Str::uuid();

@@ -639,6 +639,20 @@ textarea {
 select {
   cursor: pointer;
 }
+.supplier-dropdown {
+  position: relative;
+}
+.supplier-dropdown select {
+  appearance: none;
+  padding-right: 38px;
+}
+.supplier-dropdown > svg {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -901,6 +915,138 @@ dialog::backdrop {
 .modal-head + form > .notice {
   margin: 18px 24px 0;
 }
+dialog.receipt-dialog[open] {
+  width: 860px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.receipt-dialog > .modal-head {
+  flex-shrink: 0;
+}
+.receipt-dialog > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.receipt-form-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+.receipt-form-body > .error,
+.receipt-form-body > .notice {
+  margin: 18px 24px 0;
+}
+.receipt-dialog .modal-footer {
+  flex-shrink: 0;
+}
+.receipt-section {
+  display: grid;
+  align-content: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.receipt-section h3 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--green);
+}
+dialog.receipt-multi-dialog[open] {
+  width: 1000px;
+}
+.receipt-errors > .error {
+  margin: 18px 24px 0;
+}
+.receipt-multi-fields {
+  display: grid;
+  gap: 16px;
+  border: 0;
+  min-width: 0;
+  padding: 24px;
+  margin: 0;
+}
+.receipt-shared-fields {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.receipt-line textarea {
+  min-height: 40px;
+  height: 40px;
+  resize: vertical;
+}
+.receipt-items-heading,
+.receipt-line-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.receipt-items-heading h3,
+.receipt-line-heading h4 {
+  margin: 0;
+  font-size: 14px;
+  color: var(--green);
+}
+.receipt-line-heading h4 {
+  font-size: 12px;
+}
+.receipt-lines {
+  display: grid;
+  gap: 14px;
+}
+.receipt-line {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.receipt-line-main {
+  display: grid;
+  grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 14px;
+  align-items: end;
+}
+.receipt-line-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 14px;
+  align-items: start;
+}
+.receipt-line-serials .button {
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .receipt-multi-fields {
+    padding: 16px;
+    gap: 14px;
+  }
+  .receipt-line-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .receipt-line-main > .field:first-child {
+    grid-column: 1 / -1;
+  }
+  .receipt-line-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .receipt-section {
+    padding: 16px;
+    gap: 14px;
+  }
+}
+@media (max-width: 380px) {
+  .receipt-section {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1123,6 +1269,19 @@ dialog::backdrop {
 }
 
 /* Barcode capture and review */
+dialog.barcode-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.barcode-dialog > .modal-head,
+.barcode-dialog > .modal-footer {
+  flex-shrink: 0;
+}
+.barcode-dialog > .barcode-scanner {
+  min-height: 0;
+  overflow-y: auto;
+}
 .barcode-field {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

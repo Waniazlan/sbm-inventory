@@ -19,6 +19,7 @@ Route::prefix('v1')->group(function () {
         Route::get('dashboard', [StockController::class, 'dashboard']);
         Route::get('metadata', [CatalogueController::class, 'metadata']);
         Route::get('items', [CatalogueController::class, 'index']);
+        Route::get('items/options', [CatalogueController::class, 'options']);
         Route::get('items/{item}', [CatalogueController::class, 'show']);
         Route::get('movements', [StockController::class, 'index']);
         Route::post('movements', [StockController::class, 'post']);
@@ -45,5 +46,5 @@ Route::prefix('v1')->group(function () {
         Route::post('stock/validate', [IntegrationController::class, 'validateStock']);
         Route::post('stock/{direction}', [IntegrationController::class, 'post'])->whereIn('direction', ['in', 'out']);
     });
-    Route::post('repair/usage', fn (Request $r, Ledger $l) => app(IntegrationController::class)->post($r,$l,'out'))->middleware(['integration:repair', 'throttle:120,1']);
+    Route::post('repair/usage', fn (Request $r, Ledger $l) => app(IntegrationController::class)->post($r, $l, 'out'))->middleware(['integration:repair', 'throttle:120,1']);
 });

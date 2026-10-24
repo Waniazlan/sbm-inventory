@@ -17,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 
 class CatalogueController
 {
-    private const BARCODE_FORMAT_RULE = 'regex:/\A[A-Za-z0-9]{1,100}\z/';
+    private const BARCODE_FORMAT_RULE = 'regex:/\A[^\x00-\x1F\x7F-\x9F]{1,500}\z/u';
 
     public static function query(Request $r)
     {
@@ -79,6 +79,11 @@ class CatalogueController
         return self::present($item->load(['category', 'supplier', 'phoneModels']), $r->user()->role === 'admin');
     }
 
+    public function options()
+    {
+        return Item::where('active', true)->orderBy('name')->get(['id', 'sku', 'name', 'stock', 'unit']);
+    }
+
     public function save(Request $r, ?Item $item = null)
     {
         $barcode = $r->validate([
@@ -90,10 +95,11 @@ class CatalogueController
                 Rule::unique('items', 'barcode')->ignore($item?->id),
             ],
         ], [
-            'barcode.regex' => 'The barcode must contain 1–100 letters and numbers only.',
+            'barcode.regex' => 'The barcode must contain 1–500 characters without line breaks or control characters.',
             'barcode.unique' => 'This barcode is already assigned to another item.',
         ]);
-        $d = $r->validate(['sku' => ['required', 'string', 'max:100', Rule::unique('items')->ignore($item?->id)], 'name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'required|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);
+        // SKUs are assigned on creation and cannot be changed through the API.
+        $d = $r->validate(['name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'required|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);
 
         $d = array_merge($d, $barcode);
 
@@ -107,6 +113,7 @@ class CatalogueController
                     $item->update($d);
                 } else {
                     $item = Item::create($d);
+                    $d['sku'] = $item->sku;
                 }$item->phoneModels()->sync($ids);
                 Audit::record($before ? 'item.updated' : 'item.created', (string) $item->id, ['before' => $before, 'after' => $d, 'phone_model_ids' => $ids]);
 

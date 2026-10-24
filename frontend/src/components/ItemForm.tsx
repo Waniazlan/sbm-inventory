@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Camera } from "lucide-react";
+import { Camera, ChevronDown } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { BARCODE_MAX_LENGTH, BARCODE_PATTERN } from "../lib/barcode";
 
@@ -29,7 +29,6 @@ export function ItemForm({
     const form = new FormData(e.currentTarget);
     const text = (k: string) => String(form.get(k) || "");
     const d = {
-      sku: text("sku"),
       barcode: barcode || null,
       name: text("name"),
       category_id: Number(text("category_id")),
@@ -50,7 +49,7 @@ export function ItemForm({
     setBusy(true);
     setError("");
     try {
-      await api.request({
+      const { data: saved } = await api.request<Item>({
         url: "/items" + (item ? "/" + item.id : ""),
         method: item ? "PUT" : "POST",
         data: d,
@@ -58,7 +57,7 @@ export function ItemForm({
       notify(
         item
           ? "Item updated."
-          : "Item created. Receive stock to set its opening quantity.",
+          : `Item ${saved.sku} created. Receive stock to set its opening quantity.`,
       );
       done();
       close();
@@ -89,16 +88,13 @@ export function ItemForm({
                 placeholder="e.g. iPhone 13 OLED display"
               />
             </Field>
-            <Field label="SKU">
-              <input
-                name="sku"
-                required
-                maxLength={100}
-                defaultValue={item?.sku}
-              />
-            </Field>
+            {item && (
+              <Field label="SKU">
+                <input value={item.sku} readOnly />
+              </Field>
+            )}
             <div className="barcode-field wide">
-              <Field label="Item barcode (letters and numbers)">
+              <Field label="Item barcode or QR value">
                 <input
                   name="barcode"
                   value={barcode}
@@ -110,9 +106,8 @@ export function ItemForm({
                   autoCapitalize="off"
                   spellCheck={false}
                   autoComplete="off"
-                  placeholder="Scan or enter letters and numbers"
-                  title="Enter 1–100 letters and numbers"
-                  aria-describedby="barcode-help"
+                  placeholder="Scan a barcode or QR code, or enter its value"
+                  title="Enter 1–500 characters without line breaks or control characters"
                 />
               </Field>
               <Button
@@ -122,12 +117,6 @@ export function ItemForm({
               >
                 <Camera size={17} /> Scan barcode
               </Button>
-              <small id="barcode-help">
-                One unique barcode per catalogue item. Scan, review, then save.
-                {item &&
-                  !item.barcode &&
-                  " This existing item has no barcode yet."}
-              </small>
             </div>
             <Field label="Component category">
               <select
@@ -150,15 +139,21 @@ export function ItemForm({
                 defaultValue={item?.brand || ""}
               />
             </Field>
-            <Field label="Supplier">
-              <select name="supplier_id" defaultValue={item?.supplier_id || ""}>
-                <option value="">No default supplier</option>
-                {meta.suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+            <Field label="Supplier name">
+              <div className="supplier-dropdown">
+                <select
+                  name="supplier_id"
+                  defaultValue={item?.supplier_id || ""}
+                >
+                  <option value="">Select supplier</option>
+                  {meta.suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={16} aria-hidden="true" />
+              </div>
             </Field>
             <Field label="Standard cost (MYR)">
               <input

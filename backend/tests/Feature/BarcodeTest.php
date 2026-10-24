@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -34,9 +35,9 @@ class BarcodeTest extends TestCase
         $this->putJson('/api/v1/items/'.$id, array_replace($this->payload, ['barcode' => null]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
     }
 
-    public function test_new_items_require_one_to_one_hundred_ascii_letters_and_numbers_as_a_string(): void
+    public function test_new_items_require_a_printable_barcode_string(): void
     {
-        foreach ([null, '', str_repeat('A', 101), 'ABC-123', 'ABC 123', 'ABC_123', '１２３４５６７８９０１２３４５６', 1234567890123456] as $barcode) {
+        foreach ([null, '', '   ', str_repeat('A', 501), "ABC\n123", "ABC\t123", "ABC\x00123", "ABC\x7F123", "ABC\u{0085}123", 1234567890123456] as $barcode) {
             $this->postJson('/api/v1/items', array_replace($this->payload, ['barcode' => $barcode]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
         }
         unset($this->payload['barcode']);
@@ -53,8 +54,29 @@ class BarcodeTest extends TestCase
             $this->postJson('/api/v1/items', array_replace($payload, ['sku' => 'DUP-'.$index]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
         }
         $this->getJson('/api/v1/items?barcode=00ABC123XYZ')->assertOk()->assertJsonCount(0, 'data');
-        $this->getJson('/api/v1/items?barcode=ABC-123')->assertUnprocessable();
-        $this->getJson('/api/v1/items?barcode='.str_repeat('Z', 101))->assertUnprocessable();
+        $this->getJson('/api/v1/items?barcode=ABC-123')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/items?barcode='.str_repeat('Z', 501))->assertUnprocessable();
+    }
+
+    public function test_product_qr_values_preserve_symbols_spaces_and_unicode_for_save_and_exact_lookup(): void
+    {
+        foreach (['BMIP13(IC)INCB', 'CHGUI-IP14PRO', 'LCD FULL SET (O) OP A15/A15S/A16K/C11/C12', 'https://parts.example/item?id=001&batch=A+B#screen', '配件-屏幕 (原装)', ' 00AbC-123 ', str_repeat('Z', 500)] as $index => $barcode) {
+            $payload = array_replace($this->payload, ['sku' => 'QR-'.$index, 'barcode' => $barcode]);
+            $id = $this->postJson('/api/v1/items', $payload)->assertCreated()->assertJsonPath('barcode', $barcode)->json('id');
+            $this->putJson('/api/v1/items/'.$id, $payload)->assertOk()->assertJsonPath('barcode', $barcode);
+            $this->getJson('/api/v1/items?'.http_build_query(['barcode' => $barcode]))->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $id);
+            $this->postJson('/api/v1/items', array_replace($payload, ['sku' => 'QR-DUP-'.$index]))->assertUnprocessable()->assertJsonValidationErrors('barcode');
+        }
+        $this->getJson('/api/v1/items?'.http_build_query(['barcode' => "ABC\n123"]))->assertUnprocessable();
+    }
+
+    public function test_database_constraint_rejects_control_characters_even_when_validation_is_bypassed(): void
+    {
+        $payload = array_replace($this->payload, ['barcode' => "ABC\t123"]);
+        unset($payload['phone_model_ids']);
+        $this->expectException(QueryException::class);
+        $this->expectExceptionMessage('items_barcode_format');
+        Item::create($payload);
     }
 
     public function test_existing_items_can_be_edited_and_assigned_barcodes_later(): void

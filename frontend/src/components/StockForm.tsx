@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 
 import axios from "axios";
 import { Check, Package } from "lucide-react";
+import { ReceiptForm } from "./ReceiptForm";
 import {
   api,
   errorText,
@@ -13,20 +14,28 @@ import {
 
 import { Button, ErrorBox, Field, Modal } from "../components/shared";
 import { useApp, useLoad } from "../hooks";
-export function StockForm({
-  kind: initial,
-  item,
-  movement,
-  close,
-  done,
-}: {
+type StockFormProps = {
   kind: string;
   item?: Item;
   movement?: Movement;
   close: () => void;
   done: () => void;
-}) {
-  const { user, meta, notify } = useApp();
+};
+export function StockForm(props: StockFormProps) {
+  return props.kind === "receipt" ? (
+    <ReceiptForm item={props.item} close={props.close} done={props.done} />
+  ) : (
+    <SingleStockForm {...props} />
+  );
+}
+function SingleStockForm({
+  kind: initial,
+  item,
+  movement,
+  close,
+  done,
+}: StockFormProps) {
+  const { user, notify } = useApp();
   const [kind, setKind] = useState(initial),
     [selected, setSelected] = useState(item?.id.toString() || ""),
     [search, setSearch] = useState(""),
@@ -34,10 +43,6 @@ export function StockForm({
     [reference, setReference] = useState(""),
     [quantity, setQuantity] = useState("1"),
     [count, setCount] = useState("0"),
-    [supplier, setSupplier] = useState(""),
-    [cost, setCost] = useState(""),
-    [batch, setBatch] = useState(""),
-    [serials, setSerials] = useState(""),
     [approval, setApproval] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -52,7 +57,6 @@ export function StockForm({
     "/repair-jobs?search=" + encodeURIComponent(jobSearch),
   );
   const titles: Record<string, string> = {
-    receipt: "Receive stock",
     manual_out: "Issue stock",
     adjustment: "Adjust stock count",
     repair_usage: "Record repair usage",
@@ -71,10 +75,6 @@ export function StockForm({
       movement_id: movement?.id,
       reason,
       reference: reference || null,
-      supplier_id: supplier ? Number(supplier) : null,
-      unit_cost: cost ? Math.round(Number(cost) * 100) : null,
-      batch: batch || null,
-      serials: serials || null,
       approval_note: approval || null,
     };
     snapshot.current = payload;
@@ -210,56 +210,13 @@ export function StockForm({
               }
             >
               <input
-                required={
-                  kind === "adjustment" || (kind === "receipt" && !supplier)
-                }
+                required={kind === "adjustment"}
                 placeholder="e.g. GRN-1001"
                 maxLength={120}
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
               />
             </Field>
-          )}
-          {kind === "receipt" && (
-            <>
-              <Field label="Supplier">
-                <select
-                  value={supplier}
-                  onChange={(e) => setSupplier(e.target.value)}
-                >
-                  <option value="">Use reference instead</option>
-                  {meta.suppliers.map((s) => (
-                    <option value={s.id} key={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Receipt unit cost (MYR)">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cost}
-                  onChange={(e) => setCost(e.target.value)}
-                  placeholder="Optional"
-                />
-              </Field>
-              <Field label="Batch reference">
-                <input
-                  value={batch}
-                  onChange={(e) => setBatch(e.target.value)}
-                  maxLength={150}
-                />
-              </Field>
-              <Field label="Serial details">
-                <input
-                  value={serials}
-                  onChange={(e) => setSerials(e.target.value)}
-                  maxLength={2000}
-                />
-              </Field>
-            </>
           )}
           <Field label="Reason" wide>
             <textarea
