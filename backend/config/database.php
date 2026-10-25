@@ -112,7 +112,7 @@ return [
             'charset' => 'utf8',
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_SEARCH_PATH', 'public'),
+            'search_path' => env('DO_DB_SEARCH_PATH', 'public'),
             'timezone' => 'UTC',
             'sslmode' => env('DO_DB_SSLMODE', 'require'),
         ],
