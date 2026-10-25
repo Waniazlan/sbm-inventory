@@ -85,10 +85,20 @@ class CatalogueController
     {
         $detail = self::present($item->load(['category', 'supplier', 'phoneModels'])->loadSum('batches as stock_value', DB::raw('remaining_quantity::bigint * unit_cost')), $r->user()->role === 'admin');
         $detail['supplier_stock'] = $item->batches()
-            ->select('supplier_id')->selectRaw('SUM(remaining_quantity) AS quantity')
-            ->where('remaining_quantity', '>', 0)->groupBy('supplier_id')->orderBy('supplier_id')
+            ->leftJoin('movements as receipt', 'receipt.id', '=', 'stock_batches.receipt_movement_id')
+            ->select('stock_batches.supplier_id', 'receipt.brand')
+            ->selectRaw('SUM(stock_batches.remaining_quantity) AS quantity')
+            ->where('stock_batches.remaining_quantity', '>', 0)
+            ->groupBy('stock_batches.supplier_id', 'receipt.brand')
+            ->orderBy('stock_batches.supplier_id')->orderBy('receipt.brand')
             ->with('supplier:id,name')->get()
-            ->map(fn ($batch) => ['supplier_id' => $batch->supplier_id, 'supplier_name' => $batch->supplier?->name, 'quantity' => (int) $batch->quantity]);
+            ->groupBy(fn ($batch) => $batch->supplier_id ?? 'unknown')
+            ->map(fn ($batches) => [
+                'supplier_id' => $batches->first()->supplier_id,
+                'supplier_name' => $batches->first()->supplier?->name,
+                'quantity' => (int) $batches->sum('quantity'),
+                'brands' => $batches->map(fn ($batch) => ['brand' => $batch->brand, 'quantity' => (int) $batch->quantity])->values(),
+            ])->values();
 
         return $detail;
     }

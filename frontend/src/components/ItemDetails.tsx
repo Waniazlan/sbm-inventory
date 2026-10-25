@@ -28,7 +28,6 @@ export function ItemDetails({
                 Status: product.active ? "Active" : "Inactive",
                 Barcode: product.barcode || "Not assigned",
                 Stock: `${product.stock} ${product.unit}(s)`,
-                Brand: product.brand,
                 Part: product.part_number,
                 Colour: product.colour,
                 Grade: product.grade,
@@ -48,7 +47,7 @@ export function ItemDetails({
             <section className="supplier-stock" aria-label="Stock by supplier">
               <h3>Stock by supplier</h3>
               <p className="muted">
-                Current quantities remaining from each supplier.
+                Current quantities by supplier and received part brand.
               </p>
               {product.supplier_stock.length ? (
                 <div className="table-scroll">
@@ -56,26 +55,35 @@ export function ItemDetails({
                     <thead>
                       <tr>
                         <th>Supplier</th>
+                        <th>Part brand</th>
                         <th>On hand</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {product.supplier_stock.map((stock) => (
-                        <tr key={stock.supplier_id ?? "unknown"}>
-                          <td>
-                            {stock.supplier_name || "Supplier not recorded"}
-                          </td>
-                          <td>
-                            <strong>
-                              {stock.quantity} {product.unit}(s)
-                            </strong>
-                          </td>
-                        </tr>
-                      ))}
+                      {product.supplier_stock.flatMap((stock) =>
+                        stock.brands.map((entry) => (
+                          <tr
+                            key={JSON.stringify([
+                              stock.supplier_id,
+                              entry.brand,
+                            ])}
+                          >
+                            <td>
+                              {stock.supplier_name || "Supplier not recorded"}
+                            </td>
+                            <td>{entry.brand || "Brand not recorded"}</td>
+                            <td>
+                              <strong>
+                                {entry.quantity} {product.unit}(s)
+                              </strong>
+                            </td>
+                          </tr>
+                        )),
+                      )}
                     </tbody>
                     <tfoot>
                       <tr>
-                        <th>Total on hand</th>
+                        <th colSpan={2}>Total on hand</th>
                         <th>
                           {product.stock} {product.unit}(s)
                         </th>

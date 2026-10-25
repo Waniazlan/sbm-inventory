@@ -63,6 +63,7 @@ export type ItemDetail = Item & {
     supplier_id: number | null;
     supplier_name: string | null;
     quantity: number;
+    brands: { brand: string | null; quantity: number }[];
   }[];
 };
 export type Movement = {

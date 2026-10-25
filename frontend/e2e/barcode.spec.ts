@@ -136,7 +136,12 @@ async function setup(
       body = {
         ...item,
         supplier_stock: [
-          { supplier_id: null, supplier_name: null, quantity: item.stock },
+          {
+            supplier_id: null,
+            supplier_name: null,
+            quantity: item.stock,
+            brands: [{ brand: null, quantity: item.stock }],
+          },
         ],
       };
     else if (route.request().method() === "POST")

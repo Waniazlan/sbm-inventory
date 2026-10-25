@@ -125,8 +125,14 @@ test("different intake suppliers retain their batch costs through FIFO usage and
       supplierStock.getByRole("row").filter({ hasText: suppliers[0].name }),
     ).toContainText("10 piece(s)");
     await expect(
+      supplierStock.getByRole("row").filter({ hasText: suppliers[0].name }),
+    ).toContainText("Intake brand 1");
+    await expect(
       supplierStock.getByRole("row").filter({ hasText: suppliers[1].name }),
     ).toContainText("5 piece(s)");
+    await expect(
+      supplierStock.getByRole("row").filter({ hasText: suppliers[1].name }),
+    ).toContainText("Intake brand 2");
     await expect(
       supplierStock.getByRole("row").filter({ hasText: "Total on hand" }),
     ).toContainText("15 piece(s)");
@@ -170,6 +176,9 @@ test("different intake suppliers retain their batch costs through FIFO usage and
     await expect(
       supplierStock.getByRole("row").filter({ hasText: suppliers[1].name }),
     ).toContainText("3 piece(s)");
+    await expect(
+      supplierStock.getByRole("row").filter({ hasText: suppliers[1].name }),
+    ).toContainText("Intake brand 2");
     await expect(
       supplierStock.getByRole("row").filter({ hasText: "Total on hand" }),
     ).toContainText("3 piece(s)");
