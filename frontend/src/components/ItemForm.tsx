@@ -33,7 +33,6 @@ export function ItemForm({
       serial_tracking: form.get("serial_tracking") === "on",
       name: text("name"),
       category_id: Number(text("category_id")),
-      brand: text("brand"),
       colour: text("colour"),
       grade: text("grade"),
       capacity: text("capacity"),
@@ -165,13 +164,6 @@ export function ItemForm({
                   </option>
                 ))}
               </select>
-            </Field>
-            <Field label="Part brand">
-              <input
-                name="brand"
-                maxLength={100}
-                defaultValue={item?.brand || ""}
-              />
             </Field>
             <Field label="Selling price (MYR)">
               <input

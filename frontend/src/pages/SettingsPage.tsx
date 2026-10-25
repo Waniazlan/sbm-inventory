@@ -146,6 +146,7 @@ export function SettingsPage() {
                     {"brand" in x ? String(x.brand) + " " : ""}
                     {x.name}
                   </strong>
+                  {tab === "suppliers" && <small>Supplier ID: {x.id}</small>}
                   <small>
                     {"contact" in x
                       ? String(x.contact || "")

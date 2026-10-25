@@ -20,16 +20,16 @@ class UnitSerials
         return $barcode;
     }
 
-    public static function create(Item $item, ?string $serial = null): ItemUnit
+    public static function create(Item $item, int $unitCost, ?int $supplierId, ?string $serial = null): ItemUnit
     {
-        return ItemUnit::create(['item_id' => $item->id, 'serial_number' => $serial ?? self::generate()]);
+        return ItemUnit::create(['item_id' => $item->id, 'serial_number' => $serial ?? self::generate($unitCost, $supplierId)]);
     }
 
-    public static function generate(): string
+    public static function generate(int $unitCost, ?int $supplierId): string
     {
         do {
             $number = DB::selectOne("SELECT nextval('inventory_unit_serial_seq') AS number")->number;
-            $serial = sprintf('SN-%010d', $number);
+            $serial = sprintf('SN-%010d-%d-%d', $number, $unitCost, $supplierId ?? 0);
         } while (ItemUnit::where('serial_number', $serial)->exists() || Item::where('barcode', $serial)->exists());
 
         return $serial;
@@ -81,7 +81,7 @@ class UnitSerials
                 }
                 $units = collect();
                 for ($n = 0; $n < $quantity; $n++) {
-                    $units->push(self::create($item, $serials[$n] ?? null));
+                    $units->push(self::create($item, (int) $movement->unit_cost, $movement->supplier_id, $serials[$n] ?? null));
                 }
             } else {
                 $units = ItemUnit::where('item_id', $item->id)->whereIn('serial_number', $serials)->orderBy('id')->lockForUpdate()->get();

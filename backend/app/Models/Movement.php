@@ -12,7 +12,7 @@ class Movement extends Model
 
     protected function casts(): array
     {
-        return ['occurred_at' => 'datetime'];
+        return ['occurred_at' => 'datetime', 'unit_cost' => 'integer', 'total_cost' => 'integer'];
     }
 
     public function item()
@@ -33,5 +33,10 @@ class Movement extends Model
     public function reversal()
     {
         return $this->hasOne(self::class, 'reverses_id');
+    }
+
+    public function costAllocations()
+    {
+        return $this->hasMany(CostAllocation::class);
     }
 }

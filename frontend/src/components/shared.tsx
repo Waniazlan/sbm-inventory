@@ -254,6 +254,7 @@ export function MovementTable({
               <td>
                 <strong>{m.reference || "Manual entry"}</strong>
                 <small>{m.reason}</small>
+                {m.brand && <small>Part brand: {m.brand}</small>}
                 {m.supplier && <small>{m.supplier.name}</small>}
               </td>
               {showCost && (

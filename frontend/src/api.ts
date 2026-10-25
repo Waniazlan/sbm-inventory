@@ -66,6 +66,7 @@ export type ItemDetail = Item & {
   }[];
 };
 export type Movement = {
+  brand?: string | null;
   serials?: string | null;
   id: number;
   item: { id: number; sku: string; name: string };

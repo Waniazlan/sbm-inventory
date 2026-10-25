@@ -604,8 +604,13 @@ test("receipt form groups fields and keeps actions visible across desktop and mo
   await receipt.getByLabel("Quantity", { exact: true }).fill("3");
   await receipt.getByLabel("Source reference").fill("DO-123");
   await receipt.getByLabel("Receipt unit cost (MYR)").fill("12.50");
+  await receipt.getByLabel("Part brand").fill("Premium parts");
   await receipt.getByLabel("Batch reference").fill("LOT-A");
   await receipt.getByLabel("Serial details").fill("SN001\nSN002\nSN003");
+  await expect(receipt.locator(".receipt-summary")).toContainText(
+    "1 item · 3 units",
+  );
+  await expect(receipt.locator(".receipt-summary")).toContainText("RM 37.50");
   for (const [width, height] of [
     [1440, 1000],
     [390, 844],
@@ -652,6 +657,7 @@ test("receipt form groups fields and keeps actions visible across desktop and mo
         quantity: 3,
         unit_cost: 1250,
         batch: "LOT-A",
+        brand: "Premium parts",
         serials: "SN001\nSN002\nSN003",
       },
     ],

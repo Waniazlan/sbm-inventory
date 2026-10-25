@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Models\Category;
 use App\Models\Item;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class ItemSkuTest extends TestCase
@@ -38,6 +40,40 @@ class ItemSkuTest extends TestCase
         $id = $this->postJson('/api/v1/items', array_replace($this->payload, ['sku' => 'CUSTOM-SKU']))->assertCreated()->assertJsonPath('sku', 'PRN-000001')->json('id');
         $this->putJson('/api/v1/items/'.$id, array_replace($this->payload, ['sku' => 'REPLACEMENT', 'name' => 'Updated screen']))->assertOk()->assertJsonPath('sku', 'PRN-000001')->assertJsonPath('name', 'Updated screen');
         $this->putJson('/api/v1/items/'.$id, $this->payload)->assertOk()->assertJsonPath('sku', 'PRN-000001');
+    }
+
+    public function test_item_can_be_created_without_supplier_or_cost_and_receipt_records_actual_values(): void
+    {
+        $payload = $this->payload;
+        unset($payload['cost']);
+        $id = $this->postJson('/api/v1/items', $payload)->assertCreated()->json('id');
+        $this->assertDatabaseHas('items', ['id' => $id, 'supplier_id' => null, 'cost' => 0, 'stock' => 0]);
+        $supplier = Supplier::create(['name' => 'Intake supplier']);
+        $this->postJson('/api/v1/movements', [
+            'request_key' => (string) Str::uuid(),
+            'kind' => 'receipt',
+            'supplier_id' => $supplier->id,
+            'items' => [['item_id' => $id, 'quantity' => 2, 'unit_cost' => 13500]],
+        ])->assertOk();
+        $this->assertDatabaseHas('stock_batches', ['item_id' => $id, 'supplier_id' => $supplier->id, 'unit_cost' => 13500, 'remaining_quantity' => 2]);
+        $this->getJson('/api/v1/items/'.$id)->assertOk()->assertJsonPath('stock_value', 27000)->assertJsonPath('cost', 0)->assertJsonPath('supplier_id', null);
+    }
+
+    public function test_catalogue_edit_without_brand_preserves_legacy_brand(): void
+    {
+        $id = $this->postJson('/api/v1/items', $this->payload + ['brand' => 'Legacy brand'])->assertCreated()->json('id');
+        $this->putJson('/api/v1/items/'.$id, $this->payload)->assertOk()->assertJsonPath('brand', 'Legacy brand');
+    }
+
+    public function test_item_edit_without_supplier_or_cost_preserves_legacy_values(): void
+    {
+        $supplier = Supplier::create(['name' => 'Legacy supplier']);
+        $id = $this->postJson('/api/v1/items', $this->payload + ['supplier_id' => $supplier->id])->assertCreated()->json('id');
+        $payload = $this->payload;
+        unset($payload['cost']);
+        $payload['name'] = 'Updated catalogue details';
+        $this->putJson('/api/v1/items/'.$id, $payload)->assertOk()->assertJsonPath('name', 'Updated catalogue details');
+        $this->assertDatabaseHas('items', ['id' => $id, 'supplier_id' => $supplier->id, 'cost' => 1000]);
     }
 
     public function test_legacy_skus_are_preserved_and_matching_generated_values_are_skipped(): void

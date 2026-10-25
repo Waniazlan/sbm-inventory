@@ -28,6 +28,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('admin')->group(function () {
             Route::post('settings/login-background', [LoginBackgroundController::class, 'store']);
             Route::delete('settings/login-background', [LoginBackgroundController::class, 'destroy']);
+            Route::get('items/{item}/batches', [CatalogueController::class, 'batches'])->whereNumber('item');
             Route::post('items', [CatalogueController::class, 'save']);
             Route::post('items/generate-barcode', [CatalogueController::class, 'generateBarcode']);
             Route::put('items/{item}', [CatalogueController::class, 'save'])->whereNumber('item');

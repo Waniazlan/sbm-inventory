@@ -28,7 +28,7 @@ class Item extends Model
 
     protected function casts(): array
     {
-        return ['barcode' => 'string', 'serial_tracking' => 'boolean', 'active' => 'boolean', 'cost' => 'integer', 'price' => 'integer', 'stock' => 'integer'];
+        return ['barcode' => 'string', 'serial_tracking' => 'boolean', 'active' => 'boolean', 'cost' => 'integer', 'stock_value' => 'integer', 'price' => 'integer', 'stock' => 'integer'];
     }
 
     public function category()
@@ -44,5 +44,15 @@ class Item extends Model
     public function phoneModels()
     {
         return $this->belongsToMany(PhoneModel::class);
+    }
+
+    public function batches()
+    {
+        return $this->hasMany(StockBatch::class);
+    }
+
+    public function movements()
+    {
+        return $this->hasMany(Movement::class);
     }
 }

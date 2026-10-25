@@ -6,8 +6,11 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemUnit;
 use App\Models\Movement;
+use App\Models\StockBatch;
+use App\Models\Supplier;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -47,6 +50,52 @@ class UnitSerialTest extends TestCase
         $this->getJson('/api/v1/items?barcode='.$serials[0])->assertOk()->assertJsonPath('data.0.id', $this->item->id);
         $this->getJson('/api/v1/items?search='.$serials[0])->assertOk()->assertJsonCount(1, 'data');
         $this->assertDatabaseHas('movements', ['serials' => $response['movements'][0]['serials']]);
+    }
+
+    public function test_generated_serials_use_each_receipt_line_cost_and_actual_supplier_and_retry_keeps_them(): void
+    {
+        DB::select("SELECT setval('inventory_unit_serial_seq', 1, false)");
+        $supplier = Supplier::create(['name' => 'Actual intake supplier']);
+        $payload = ['request_key' => (string) Str::uuid(), 'kind' => 'receipt', 'supplier_id' => $supplier->id, 'items' => [
+            ['item_id' => $this->item->id, 'quantity' => 2, 'unit_cost' => 12050],
+            ['item_id' => $this->item->id, 'quantity' => 1, 'unit_cost' => 13500],
+        ]];
+        $response = $this->postJson('/api/v1/movements', $payload)->assertOk()->json();
+        $this->assertSame("SN-0000000001-12050-{$supplier->id}\nSN-0000000002-12050-{$supplier->id}", $response['movements'][0]['serials']);
+        $this->assertSame("SN-0000000003-13500-{$supplier->id}", $response['movements'][1]['serials']);
+        $this->item->update(['cost' => 99999]);
+        $this->postJson('/api/v1/movements', $payload)->assertExactJson($response);
+        $this->assertSame(3, ItemUnit::count());
+        $batch = StockBatch::where('receipt_movement_id', $response['movements'][0]['id'])->firstOrFail();
+        $this->assertDatabaseHas('item_units', ['serial_number' => "SN-0000000001-12050-{$supplier->id}", 'stock_batch_id' => $batch->id]);
+        $this->getJson('/api/v1/items?barcode=SN-0000000001-12050-'.$supplier->id)->assertOk()->assertJsonPath('data.0.id', $this->item->id);
+    }
+
+    public function test_generated_serials_support_zero_cost_missing_supplier_and_skip_identifier_collisions(): void
+    {
+        DB::select("SELECT setval('inventory_unit_serial_seq', 1, false)");
+        $this->item->update(['barcode' => 'SN-0000000001-0-0']);
+        $this->move(['quantity' => 1, 'unit_cost' => 0])->assertOk()->assertJsonPath('movements.0.serials', 'SN-0000000002-0-0');
+        $this->move(['quantity' => 1, 'unit_cost' => 13500, 'serials' => 'SN-0000000421'])->assertOk()->assertJsonPath('movements.0.serials', 'SN-0000000421');
+        $this->move(['quantity' => 1, 'unit_cost' => 12050])->assertOk()->assertJsonPath('movements.0.serials', 'SN-0000000003-12050-0');
+        $this->assertDatabaseHas('item_units', ['serial_number' => 'SN-0000000421']);
+    }
+
+    public function test_enabling_tracking_encodes_the_remaining_batch_costs_and_suppliers(): void
+    {
+        DB::select("SELECT setval('inventory_unit_serial_seq', 1, false)");
+        $supplierA = Supplier::create(['name' => 'Supplier A']);
+        $supplierB = Supplier::create(['name' => 'Supplier B']);
+        $legacy = Item::create(['name' => 'Previously untracked LCD', 'category_id' => $this->product['category_id']]);
+        $this->move(['item_id' => $legacy->id, 'quantity' => 2, 'unit_cost' => 12050, 'supplier_id' => $supplierA->id])->assertOk();
+        $this->move(['item_id' => $legacy->id, 'quantity' => 1, 'unit_cost' => 13500, 'supplier_id' => $supplierB->id])->assertOk();
+        $this->putJson('/api/v1/items/'.$legacy->id, array_replace($this->product, ['cost' => 99999]))->assertOk();
+        $this->assertSame([
+            "SN-0000000001-12050-{$supplierA->id}",
+            "SN-0000000002-12050-{$supplierA->id}",
+            "SN-0000000003-13500-{$supplierB->id}",
+        ], ItemUnit::where('item_id', $legacy->id)->orderBy('id')->pluck('serial_number')->all());
+        $this->artisan('inventory:reconcile')->assertExitCode(0);
     }
 
     public function test_own_serials_are_preserved_and_wrong_counts_duplicates_and_unknown_serials_roll_back(): void

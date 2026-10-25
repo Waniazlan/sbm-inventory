@@ -959,7 +959,7 @@ dialog.receipt-dialog[open] {
   color: var(--green);
 }
 dialog.receipt-multi-dialog[open] {
-  width: 1000px;
+  width: 920px;
 }
 .receipt-errors > .error {
   margin: 18px 24px 0;
@@ -974,6 +974,49 @@ dialog.receipt-multi-dialog[open] {
 }
 .receipt-shared-fields {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  background: #f7faf7;
+}
+.receipt-section-heading {
+  grid-column: 1 / -1;
+}
+.receipt-section-heading p,
+.receipt-items-heading p {
+  font-size: 12px;
+  color: #758176;
+  margin-top: 5px;
+}
+.receipt-product-field {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.receipt-line-details h5 {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: #46574c;
+}
+.receipt-line-details h5 span {
+  margin-left: 6px;
+  color: #758176;
+  font-weight: 400;
+}
+.receipt-footer .receipt-summary {
+  margin-right: auto;
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: #758176;
+}
+.receipt-summary strong {
+  color: #46574c;
+  font-size: 13px;
+}
+.receipt-summary strong span {
+  margin-left: 10px;
+  color: var(--green);
+}
+.receipt-dialog .receipt-footer {
+  align-items: center;
 }
 .receipt-line textarea {
   min-height: 40px;
@@ -1010,11 +1053,13 @@ dialog.receipt-multi-dialog[open] {
 }
 .receipt-line-main {
   display: grid;
-  grid-template-columns: minmax(0, 2.5fr) minmax(0, 1fr) minmax(0, 1.3fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 0.8fr) minmax(0, 1fr);
   gap: 14px;
   align-items: end;
 }
 .receipt-line-details {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   gap: 14px;
@@ -1031,8 +1076,25 @@ dialog.receipt-multi-dialog[open] {
   .receipt-line-main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .receipt-line-main > .field:first-child {
+  .receipt-line-main > .field:nth-child(2) {
     grid-column: 1 / -1;
+  }
+  .receipt-dialog .receipt-footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .receipt-footer .receipt-summary {
+    grid-column: 1 / -1;
+    margin-right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .receipt-summary strong span {
+    margin-left: 4px;
   }
   .receipt-line-details {
     grid-template-columns: minmax(0, 1fr);

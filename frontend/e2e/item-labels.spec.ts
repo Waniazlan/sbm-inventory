@@ -163,3 +163,126 @@ test("store barcode, individual serials, printable stickers and exact serial loo
     );
   }
 });
+
+test("generated unit labels encode intake cost and supplier ID and decode to the exact serial", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Email address").fill(credentials.email);
+  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Stock overview" }),
+  ).toBeVisible();
+  const { item, supplier } = await page.evaluate(async () => {
+    // @ts-expect-error Vite serves the application API module in the browser.
+    const { api } = await import("/src/api.ts");
+    const metadata = (await api.get("/metadata")).data;
+    const supplier =
+      metadata.suppliers[0] ||
+      (
+        await api.post("/metadata/suppliers", {
+          name: `Generated serial verification ${Date.now()}`,
+        })
+      ).data;
+    const item = (
+      await api.post("/items", {
+        name: `Generated serial verification LCD ${Date.now()}`,
+        category_id: metadata.categories[0].id,
+        unit: "piece",
+        minimum_stock: 0,
+        active: true,
+        price: 20000,
+        phone_model_ids: [],
+        serial_tracking: true,
+      })
+    ).data;
+    return { item, supplier };
+  });
+  let receiptId: number | undefined;
+  try {
+    await page.getByRole("link", { name: "Item catalogue" }).click();
+    await page.getByLabel("Search catalogue").fill(item.sku);
+    const row = page.getByRole("row").filter({ hasText: item.sku });
+    const dialog = page.getByRole("dialog");
+    await row.getByRole("button", { name: "Receive", exact: true }).click();
+    await dialog
+      .getByRole("combobox", { name: "Supplier", exact: true })
+      .selectOption(String(supplier.id));
+    await dialog.getByLabel("Quantity", { exact: true }).fill("2");
+    await dialog.getByLabel("Receipt unit cost (MYR)").fill("120.50");
+    await dialog
+      .getByLabel("Source reference")
+      .fill(`${item.sku}-SERIAL-ENCODING`);
+    const receiving = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/api/v1/movements") &&
+        response.request().method() === "POST",
+    );
+    await dialog
+      .getByRole("button", { name: "Receive stock", exact: true })
+      .click();
+    const response = await receiving;
+    expect(response.ok()).toBe(true);
+    const receipt = await response.json();
+    receiptId = receipt.movements[0].id;
+    const serials: string[] = receipt.movements[0].serials.split("\n");
+    expect(serials).toHaveLength(2);
+    expect(new Set(serials).size).toBe(2);
+    for (const serial of serials) {
+      expect(serial).toMatch(/^SN-\d{10,}-\d+-\d+$/);
+      expect(serial.endsWith(`-12050-${supplier.id}`)).toBe(true);
+    }
+    await expect(dialog).not.toBeVisible();
+    await row
+      .getByRole("button", { name: "Labels & serials", exact: true })
+      .click();
+    await dialog.getByLabel("Sticker size").selectOption("50x30");
+    await dialog.getByLabel("Label type").selectOption("units");
+    await dialog.getByLabel(`Print ${serials[0]}`, { exact: true }).check();
+    await expect(dialog.locator(".barcode-sticker img")).toHaveCount(1);
+    await expect(dialog.locator(".barcode-sticker")).toHaveAttribute(
+      "data-ready",
+      "true",
+    );
+    const decoded = await page.evaluate(async () => {
+      const image = document.querySelector<HTMLImageElement>(
+        ".barcode-sticker img",
+      )!;
+      await image.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      canvas.getContext("2d")!.drawImage(image, 0, 0);
+      // @ts-expect-error Vite serves the application scanner module in the browser.
+      const { decodeBarcode } = await import("/src/lib/barcode.ts");
+      return decodeBarcode(canvas);
+    });
+    expect(decoded).toBe(serials[0]);
+    await dialog
+      .getByRole("button", { name: "Close dialog", exact: true })
+      .click();
+    await page.getByLabel("Search catalogue").fill(serials[0]);
+    await expect(row).toBeVisible();
+  } finally {
+    await page.evaluate(
+      async ({ item, receiptId }) => {
+        // @ts-expect-error Vite serves the application API module in the browser.
+        const { api } = await import("/src/api.ts");
+        if (receiptId)
+          await api.post("/movements", {
+            request_key: crypto.randomUUID(),
+            kind: "reversal",
+            movement_id: receiptId,
+            reason: "Close generated serial verification receipt",
+          });
+        await api.put(`/items/${item.id}`, {
+          ...item,
+          active: false,
+          phone_model_ids: [],
+        });
+      },
+      { item, receiptId },
+    );
+  }
+});

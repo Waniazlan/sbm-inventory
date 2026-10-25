@@ -48,6 +48,37 @@ class ReceiptTest extends TestCase
         }
     }
 
+    public function test_receipts_keep_each_line_brand_without_overwriting_catalogue_or_earlier_receipts(): void
+    {
+        $this->lcd->update(['brand' => 'Legacy catalogue brand']);
+        $this->payload['items'][0]['brand'] = 'Brand A';
+        $this->payload['items'][1]['brand'] = 'Brand B';
+        $response = $this->postJson('/api/v1/movements', $this->payload)->assertOk()->json();
+        $this->postJson('/api/v1/movements', $this->payload)->assertExactJson($response);
+        $this->payload['items'][0]['brand'] = 'Replacement brand';
+        $this->postJson('/api/v1/movements', $this->payload)->assertConflict();
+        $this->payload['request_key'] = (string) Str::uuid();
+        $this->postJson('/api/v1/movements', $this->payload)->assertOk();
+        $this->assertSame('Legacy catalogue brand', $this->lcd->fresh()->brand);
+        $this->assertDatabaseHas('movements', ['id' => $response['movements'][0]['id'], 'brand' => 'Brand A']);
+        $this->assertDatabaseHas('movements', ['id' => $response['movements'][1]['id'], 'brand' => 'Brand B']);
+        $this->getJson('/api/v1/movements?item_id='.$this->lcd->id)->assertOk()->assertJsonPath('data.0.brand', 'Replacement brand');
+        $csv = $this->get('/api/v1/reports?kind=movements&format=csv')->assertOk();
+        $this->assertStringContainsString('Brand A', $csv->streamedContent());
+    }
+
+    public function test_receipt_brand_length_is_validated_and_legacy_single_receipt_supports_brand(): void
+    {
+        $this->payload['items'][1]['brand'] = str_repeat('X', 101);
+        $this->postJson('/api/v1/movements', $this->payload)->assertUnprocessable()->assertJsonValidationErrors('items.1.brand');
+        $this->assertSame(0, Movement::count());
+        $this->postJson('/api/v1/movements', [
+            'request_key' => (string) Str::uuid(), 'kind' => 'receipt', 'item_id' => $this->lcd->id,
+            'quantity' => 1, 'reference' => 'BRAND-LEGACY', 'brand' => 'Single receipt brand',
+        ])->assertOk();
+        $this->assertDatabaseHas('movements', ['reference' => 'BRAND-LEGACY', 'brand' => 'Single receipt brand']);
+    }
+
     public function test_blank_receipt_reason_uses_same_default_and_can_retry_without_reason(): void
     {
         $response = $this->postJson('/api/v1/movements', $this->payload + ['reason' => '   '])->assertOk()->json();

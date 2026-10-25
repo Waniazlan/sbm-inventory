@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import axios from "axios";
 import { Camera, Check, Minus, Plus } from "lucide-react";
-import { api, errorText, type Item } from "../api";
+import { api, errorText, money, type Item } from "../api";
 import { useApp, useLoad } from "../hooks";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { Button, ErrorBox, Field, Modal } from "./shared";
@@ -16,6 +16,7 @@ type ReceiptLine = {
   quantity: string;
   cost: string;
   batch: string;
+  brand: string;
   serials: string;
 };
 const newLine = (itemId = ""): ReceiptLine => ({
@@ -24,6 +25,7 @@ const newLine = (itemId = ""): ReceiptLine => ({
   quantity: "1",
   cost: "",
   batch: "",
+  brand: "",
   serials: "",
 });
 
@@ -95,6 +97,7 @@ export function ReceiptForm({
         quantity: Number(line.quantity),
         unit_cost: line.cost ? Math.round(Number(line.cost) * 100) : null,
         batch: line.batch || null,
+        brand: line.brand || null,
         serials: line.serials || null,
       })),
     };
@@ -121,11 +124,26 @@ export function ReceiptForm({
       setBusy(false);
     }
   }
+  const totalUnits = lines.reduce(
+    (total, line) => total + (Number(line.quantity) || 0),
+    0,
+  );
+  const costComplete = lines.every(
+    (line) => line.cost !== "" && Number.isFinite(Number(line.cost)),
+  );
+  const receiptTotal = costComplete
+    ? lines.reduce(
+        (total, line) =>
+          total + Math.round(Number(line.cost) * 100) * Number(line.quantity),
+        0,
+      )
+    : null;
   return (
     <>
       <Modal
         className="receipt-dialog receipt-multi-dialog"
         title="Receive stock"
+        subtitle="Record a delivery and the items received."
         close={() => {
           if (!busy) close();
         }}
@@ -149,7 +167,10 @@ export function ReceiptForm({
                 className="receipt-section receipt-shared-fields"
                 aria-label="Delivery details"
               >
-                <h3>Delivery details</h3>
+                <div className="receipt-section-heading">
+                  <h3>Delivery details</h3>
+                  <p>Supplier and reference apply to all items below.</p>
+                </div>
                 <Field label="Supplier">
                   <select
                     value={supplier}
@@ -174,7 +195,12 @@ export function ReceiptForm({
                 </Field>
               </section>
               <div className="receipt-items-heading">
-                <h3>Items</h3>
+                <div>
+                  <h3>Items</h3>
+                  <p>
+                    Enter the quantity, purchase cost and brand for each item.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="secondary"
@@ -184,10 +210,6 @@ export function ReceiptForm({
                   <Plus size={16} /> Add item
                 </Button>
               </div>
-              <p className="muted">
-                Select the supplier for this delivery and enter the actual
-                purchase cost on each item row.
-              </p>
               <ErrorBox message={products.error} />
               {products.error && (
                 <Button
@@ -223,27 +245,41 @@ export function ReceiptForm({
                       </Button>
                     </div>
                     <div className="receipt-line-main">
-                      <Field label="Item">
-                        <select
-                          required
-                          autoFocus={index > 0}
-                          value={line.itemId}
-                          onChange={(event) =>
-                            updateLine(line.key, { itemId: event.target.value })
-                          }
-                          disabled={products.loading}
-                        >
-                          <option value="">
-                            {products.loading
-                              ? "Loading items…"
-                              : "Select item"}
-                          </option>
-                          {products.data?.map((product) => (
-                            <option key={product.id} value={product.id}>
-                              {product.sku} · {product.name}
+                      <div className="receipt-product-field">
+                        <Field label="Item">
+                          <select
+                            required
+                            autoFocus={index > 0}
+                            value={line.itemId}
+                            onChange={(event) =>
+                              updateLine(line.key, {
+                                itemId: event.target.value,
+                              })
+                            }
+                            disabled={products.loading}
+                          >
+                            <option value="">
+                              {products.loading
+                                ? "Loading items…"
+                                : "Select item"}
                             </option>
-                          ))}
-                        </select>
+                            {products.data?.map((product) => (
+                              <option key={product.id} value={product.id}>
+                                {product.sku} · {product.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </div>
+                      <Field label="Part brand">
+                        <input
+                          maxLength={100}
+                          value={line.brand}
+                          onChange={(event) =>
+                            updateLine(line.key, { brand: event.target.value })
+                          }
+                          placeholder="Optional"
+                        />
                       </Field>
                       <Field label="Quantity">
                         <input
@@ -275,6 +311,9 @@ export function ReceiptForm({
                       </Field>
                     </div>
                     <div className="receipt-line-details">
+                      <h5>
+                        Batch &amp; serial details <span>Optional</span>
+                      </h5>
                       <Field label="Batch reference">
                         <input
                           maxLength={150}
@@ -287,7 +326,7 @@ export function ReceiptForm({
                       <div className="barcode-field receipt-line-serials">
                         <Field label="Serial details">
                           <textarea
-                            rows={2}
+                            rows={1}
                             placeholder={
                               products.data?.find(
                                 (p) => p.id === Number(line.itemId),
@@ -320,7 +359,16 @@ export function ReceiptForm({
               </div>
             </fieldset>
           </div>
-          <div className="modal-footer">
+          <div className="modal-footer receipt-footer">
+            <div className="receipt-summary">
+              <span>
+                {lines.length} item{lines.length === 1 ? "" : "s"} ·{" "}
+                {totalUnits} unit{totalUnits === 1 ? "" : "s"}
+              </span>
+              <strong>
+                Total cost <span>{money(receiptTotal)}</span>
+              </strong>
+            </div>
             <Button
               type="button"
               variant="secondary"

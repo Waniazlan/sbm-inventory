@@ -70,6 +70,8 @@ class Ledger
                 foreach ($data['items'] as $row) {
                     $item = $items->get($row['item_id']);
                     abort_unless($item, 422, 'Unknown inventory item.');
+                    $costs = app(StockCosts::class);
+                    $costs->initialize($item);
                     abort_if(! $item->active && ! in_array($data['kind'], ['reversal', 'return']), 422, 'This item is inactive.');
                     if ($data['kind'] === 'return') {
                         $sold = Movement::where('source', 'sales')->where('type', 'sale')->where('reference', $data['original_reference'])->where('item_id', $item->id)->get();
@@ -89,6 +91,7 @@ class Ledger
                     if ($item->stock + $delta > 100000000) {
                         throw ValidationException::withMessages(['stock' => 'Stock quantity exceeds the supported limit.']);
                     }
+                    $unitCost = (int) ($row['unit_cost'] ?? $data['unit_cost'] ?? $item->cost);
                     $serialText = $row['serials'] ?? $data['serials'] ?? null;
                     if ($item->serial_tracking) {
                         if (abs($delta) > 1000) {
@@ -97,11 +100,16 @@ class Ledger
                         if ($reversal) {
                             $serialText = ItemUnit::whereIn('id', DB::table('movement_units')->where('movement_id', $reversal->id)->pluck('item_unit_id'))->orderBy('id')->pluck('serial_number')->implode("\n");
                         } elseif ($delta > 0 && $data['kind'] !== 'return' && ! UnitSerials::parse($serialText)) {
-                            $serialText = implode("\n", array_map(fn () => UnitSerials::generate(), range(1, $delta)));
+                            $serialText = implode("\n", array_map(fn () => UnitSerials::generate($unitCost, $data['supplier_id'] ?? null), range(1, $delta)));
                         }
                     }
-                    $m = Movement::create(['item_id' => $item->id, 'operation_id' => $op->id, 'type' => $data['kind'], 'quantity' => abs($delta), 'delta' => $delta, 'balance_before' => $item->stock, 'balance_after' => $item->stock + $delta, 'reason' => $data['reason'], 'source' => $source, 'reference' => $reversal?->reference ?? $data['reference'] ?? null, 'repair_job_reference' => $data['repair_job_reference'] ?? ($data['kind'] === 'repair_usage' ? ($data['reference'] ?? null) : null), 'original_reference' => $reversal?->original_reference ?? $data['original_reference'] ?? null, 'line_id' => $row['line_id'] ?? null, 'actor_id' => $actor, 'actor_reference' => $data['actor_reference'] ?? null, 'supplier_id' => $data['supplier_id'] ?? null, 'unit_cost' => $row['unit_cost'] ?? $data['unit_cost'] ?? $item->cost, 'batch' => $row['batch'] ?? $data['batch'] ?? null, 'serials' => $serialText, 'approval_note' => $data['approval_note'] ?? null, 'reverses_id' => $reversal?->id, 'occurred_at' => $data['occurred_at'] ?? now(), 'created_at' => now()]);
+                    $m = new Movement(['item_id' => $item->id, 'operation_id' => $op->id, 'type' => $data['kind'], 'quantity' => abs($delta), 'delta' => $delta, 'balance_before' => $item->stock, 'balance_after' => $item->stock + $delta, 'reason' => $data['reason'], 'source' => $source, 'reference' => $reversal?->reference ?? $data['reference'] ?? null, 'repair_job_reference' => $data['repair_job_reference'] ?? ($data['kind'] === 'repair_usage' ? ($data['reference'] ?? null) : null), 'original_reference' => $reversal?->original_reference ?? $data['original_reference'] ?? null, 'line_id' => $row['line_id'] ?? null, 'actor_id' => $actor, 'actor_reference' => $data['actor_reference'] ?? null, 'supplier_id' => $data['supplier_id'] ?? null, 'brand' => $reversal?->brand ?? ($data['kind'] === 'receipt' ? ($row['brand'] ?? $data['brand'] ?? null) : null), 'unit_cost' => $unitCost, 'batch' => $row['batch'] ?? $data['batch'] ?? null, 'serials' => $serialText, 'approval_note' => $data['approval_note'] ?? null, 'reverses_id' => $reversal?->id, 'occurred_at' => $data['occurred_at'] ?? now(), 'created_at' => now()]);
+                    $plan = $costs->plan($item, $m, $reversal);
+                    $unitCosts = array_unique(array_map(fn ($a) => $a['batch']->unit_cost, $plan));
+                    $m->unit_cost = count($unitCosts) === 1 ? reset($unitCosts) : null;
+                    $m->save();
                     app(UnitSerials::class)->apply($item, $m, $serialText, $reversal);
+                    $costs->apply($item, $m, $plan);
                     $item->stock += $delta;
                     $item->save();
                     $result[] = ['id' => $m->id, 'item_id' => $item->id, 'line_id' => $m->line_id, 'delta' => $delta, 'balance' => $item->stock, 'serials' => $m->serials];

@@ -25,5 +25,15 @@ Artisan::command('inventory:reconcile', function () {
         $this->error(json_encode($bad));
 
         return 1;
-    }$this->info('All cached balances match the movement ledger.');
+    }
+    $batches = DB::select('SELECT i.id, i.sku, i.stock, COALESCE(SUM(b.remaining_quantity),0) AS batch_balance FROM items i LEFT JOIN stock_batches b ON b.item_id=i.id GROUP BY i.id HAVING i.stock <> COALESCE(SUM(b.remaining_quantity),0)');
+    $allocations = DB::select('SELECT m.id, m.delta, COALESCE(SUM(a.quantity),0) AS allocated FROM movements m LEFT JOIN cost_allocations a ON a.movement_id=m.id GROUP BY m.id HAVING m.delta <> COALESCE(SUM(a.quantity),0)');
+    $serials = DB::select('SELECT b.id, b.remaining_quantity, COUNT(u.id) AS available_serials FROM stock_batches b JOIN items i ON i.id=b.item_id LEFT JOIN item_units u ON u.stock_batch_id=b.id AND u.in_stock WHERE i.serial_tracking GROUP BY b.id HAVING b.remaining_quantity <> COUNT(u.id)');
+    $unassigned = DB::table('item_units')->where('in_stock', true)->whereNull('stock_batch_id')->count();
+    if ($batches || $allocations || $serials || $unassigned) {
+        $this->error(json_encode(['batches' => $batches, 'allocations' => $allocations, 'serials' => $serials, 'unassigned_units' => $unassigned]));
+
+        return 1;
+    }
+    $this->info('All cached balances, batches, cost allocations and serials match the movement ledger.');
 });

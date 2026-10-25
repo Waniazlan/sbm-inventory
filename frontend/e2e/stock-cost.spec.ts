@@ -54,6 +54,7 @@ test("different intake suppliers retain their batch costs through FIFO usage and
   await dialog.getByLabel("Component category").selectOption({ index: 1 });
   await expect(dialog.locator('[name="supplier_id"]')).toHaveCount(0);
   await expect(dialog.locator('[name="cost"]')).toHaveCount(0);
+  await expect(dialog.getByLabel("Part brand")).toHaveCount(0);
   await dialog.getByLabel("Selling price (MYR)").fill("200.00");
   const creation = page.waitForResponse(
     (r) => r.url().endsWith("/api/v1/items") && r.request().method() === "POST",
@@ -88,6 +89,7 @@ test("different intake suppliers retain their batch costs through FIFO usage and
         .getByLabel("Source reference")
         .fill(`${item.sku}-LOT-${index}`);
       await dialog.getByLabel("Batch reference").fill(`LOT-${index}`);
+      await dialog.getByLabel("Part brand").fill(`Intake brand ${index + 1}`);
       await dialog
         .getByLabel("Quantity", { exact: true })
         .fill(String(quantity));
@@ -108,7 +110,8 @@ test("different intake suppliers retain their batch costs through FIFO usage and
     await expect(dialog.locator('[name="supplier_id"]')).toHaveCount(0);
     await expect(dialog.locator('[name="cost"]')).toHaveCount(0);
     await expect(dialog.getByLabel("Selling price (MYR)")).toHaveValue("200");
-    await dialog.getByLabel("Part brand").fill("Edited catalogue brand");
+    await expect(dialog.getByLabel("Part brand")).toHaveCount(0);
+    await dialog.getByLabel("Notes").fill("Edited catalogue notes");
     await dialog
       .getByRole("button", { name: "Save item", exact: true })
       .click();
@@ -188,6 +191,15 @@ test("different intake suppliers retain their batch costs through FIFO usage and
     expect(current.price).toBe(20000);
     expect(current.supplier_id).toBeNull();
     expect(current.cost).toBe(0);
+    const receipts = await page.evaluate(async (id) => {
+      // @ts-expect-error Vite serves the application API module in the browser.
+      const { api } = await import("/src/api.ts");
+      return (await api.get(`/movements?item_id=${id}&type=receipt`)).data.data;
+    }, item.id);
+    expect(
+      receipts.map((receipt: { brand: string }) => receipt.brand).sort(),
+    ).toEqual(["Intake brand 1", "Intake brand 2"]);
+    expect(current.brand).toBeNull();
     expect(errors).toEqual([]);
   } finally {
     // Preserve immutable verification history while returning all test stock to zero.

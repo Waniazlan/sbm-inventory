@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Item;
 use App\Models\Movement;
+use App\Models\StockBatch;
 use App\Services\Ledger;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class StockController
 {
@@ -17,17 +19,19 @@ class StockController
         $rules = ['request_key' => 'required|uuid', 'kind' => 'required|in:receipt,manual_out,adjustment,repair_usage,reversal', 'item_id' => 'required_unless:kind,reversal|integer|exists:items,id', 'quantity' => 'required_unless:kind,adjustment,reversal|integer|min:1|max:100000000', 'reason' => 'required|string|min:3|max:500', 'reference' => 'required_if:kind,repair_usage,adjustment|nullable|string|max:120', 'counted_quantity' => 'required_if:kind,adjustment|integer|min:0|max:100000000', 'movement_id' => 'required_if:kind,reversal|integer|exists:movements,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'unit_cost' => 'nullable|integer|min:0|max:100000000', 'batch' => 'nullable|string|max:150', 'serials' => 'nullable|string|max:130000', 'approval_note' => 'nullable|string|max:1000', 'occurred_at' => 'nullable|date|before_or_equal:now'];
         if ($r->input('kind') === 'receipt') {
             $rules['reason'] = 'nullable|string|min:3|max:500';
+            $rules['brand'] = 'nullable|string|max:100';
         }
         if ($multiReceipt) {
-            foreach (['item_id', 'quantity', 'unit_cost', 'batch', 'serials'] as $field) {
+            foreach (['item_id', 'quantity', 'unit_cost', 'batch', 'serials', 'brand'] as $field) {
                 $rules[$field] = 'prohibited';
             }
             $rules += [
                 'items' => 'required|array|min:1|max:100',
-                'items.*' => 'required|array:item_id,quantity,unit_cost,batch,serials',
+                'items.*' => 'required|array:item_id,quantity,unit_cost,batch,serials,brand',
                 'items.*.item_id' => 'required|integer|exists:items,id',
                 'items.*.quantity' => 'required|integer|min:1|max:100000000',
                 'items.*.unit_cost' => 'nullable|integer|min:0|max:100000000',
+                'items.*.brand' => 'nullable|string|max:100',
                 'items.*.batch' => 'nullable|string|max:150',
                 'items.*.serials' => 'nullable|string|max:130000',
             ];
@@ -53,6 +57,10 @@ class StockController
     {
         $r->validate(['actor_id' => 'nullable|integer', 'item_id' => 'nullable|integer', 'search' => 'nullable|string|max:200', 'type' => 'nullable|string|max:40', 'source' => 'nullable|string|max:40']);
         $q = Movement::with(['item:id,sku,name', 'actor:id,name', 'supplier:id,name', 'reversal:id,reverses_id']);
+        if ($r->user()->role === 'admin') {
+            $q->withSum('costAllocations as total_cost', DB::raw('ABS(quantity::bigint) * unit_cost'))
+                ->selectSub(DB::table('cost_allocations')->selectRaw('CASE WHEN MIN(unit_cost) = MAX(unit_cost) THEN MIN(unit_cost) END')->whereColumn('movement_id', 'movements.id'), 'allocated_unit_cost');
+        }
         if ($r->user()->role !== 'admin') {
             $q->where('actor_id', $r->user()->id);
         }if ($r->filled('item_id')) {
@@ -77,14 +85,17 @@ class StockController
     public function index(Request $r)
     {
         $p = self::query($r)->orderByDesc('id')->paginate(25);
-        if ($r->user()->role !== 'admin') {
-            $p->through(function ($m) {
-                $d = $m->toArray();
-                unset($d['unit_cost'],$d['approval_note']);
+        $p->through(function ($m) use ($r) {
+            $d = $m->toArray();
+            if ($r->user()->role === 'admin') {
+                $d['unit_cost'] = $m->allocated_unit_cost === null ? null : (int) $m->allocated_unit_cost;
+            } else {
+                unset($d['unit_cost'], $d['approval_note']);
+            }
+            unset($d['allocated_unit_cost']);
 
-                return $d;
-            });
-        }
+            return $d;
+        });
 
         return $p;
     }
@@ -93,7 +104,7 @@ class StockController
     {
         $admin = $r->user()->role === 'admin';
 
-        return ['items' => Item::where('active', true)->count(), 'units' => (int) Item::sum('stock'), 'low_stock' => Item::where('active', true)->whereColumn('stock', '<=', 'minimum_stock')->count(), 'out_of_stock' => Item::where('active', true)->where('stock', 0)->count(), 'valuation' => $admin ? (int) Item::selectRaw('COALESCE(SUM(stock::bigint*cost),0) as total')->value('total') : null, 'recent' => $this->index($r)->items(), 'low_items' => Item::with(['category', 'phoneModels'])->where('active', true)->whereColumn('stock', '<=', 'minimum_stock')->orderBy('stock')->limit(8)->get()->map(fn ($i) => CatalogueController::present($i, $admin))];
+        return ['items' => Item::where('active', true)->count(), 'units' => (int) Item::sum('stock'), 'low_stock' => Item::where('active', true)->whereColumn('stock', '<=', 'minimum_stock')->count(), 'out_of_stock' => Item::where('active', true)->where('stock', 0)->count(), 'valuation' => $admin ? (int) StockBatch::selectRaw('COALESCE(SUM(remaining_quantity::bigint * unit_cost),0) as total')->value('total') : null, 'recent' => $this->index($r)->items(), 'low_items' => Item::with(['category', 'phoneModels'])->withSum('batches as stock_value', DB::raw('remaining_quantity::bigint * unit_cost'))->where('active', true)->whereColumn('stock', '<=', 'minimum_stock')->orderBy('stock')->limit(8)->get()->map(fn ($i) => CatalogueController::present($i, $admin))];
     }
 
     public function audit()
@@ -109,7 +120,7 @@ class StockController
             if ($kind === 'low') {
                 $r->merge(['status' => 'low']);
             }$q = CatalogueController::query($r)->orderBy('sku');
-            $map = fn ($i) => ['SKU' => $i->sku, 'Name' => $i->name, 'Category' => $i->category->name, 'Compatibility' => $i->phoneModels->map(fn ($p) => $p->brand.' '.$p->name)->implode('; '), 'Stock' => $i->stock, 'Minimum' => $i->minimum_stock, 'Unit cost (sen)' => $i->cost, 'Value (sen)' => $i->stock * $i->cost];
+            $map = fn ($i) => ['SKU' => $i->sku, 'Name' => $i->name, 'Category' => $i->category->name, 'Compatibility' => $i->phoneModels->map(fn ($p) => $p->brand.' '.$p->name)->implode('; '), 'Stock' => $i->stock, 'Minimum' => $i->minimum_stock, 'Value (sen)' => (int) ($i->stock_value ?? 0)];
         } else {
             if ($kind === 'repairs') {
                 $r->merge(['type' => 'repair_usage']);
@@ -117,11 +128,11 @@ class StockController
                 $r->merge(['source' => 'sales']);
             }$q = self::query($r);
             if ($kind === 'reasons') {
-                $q->where('delta', '<', 0)->selectRaw('type, reason, SUM(quantity) as quantity')->groupBy('type', 'reason')->setEagerLoads([])->orderBy('type');
+                $q->where('delta', '<', 0)->select([])->selectRaw('type, reason, SUM(quantity) as quantity')->groupBy('type', 'reason')->setEagerLoads([])->orderBy('type');
                 $map = fn ($m) => ['Type' => $m->type, 'Reason' => $m->reason, 'Quantity' => (int) $m->quantity];
             } else {
                 $q->orderByDesc('id');
-                $map = fn ($m) => ['ID' => $m->id, 'SKU' => $m->item->sku, 'Type' => $m->type, 'Change' => $m->delta, 'Before' => $m->balance_before, 'After' => $m->balance_after, 'Reason' => $m->reason, 'Source' => $m->source, 'Reference' => $m->reference, 'Repair job' => $m->repair_job_reference, 'External line' => $m->line_id, 'Actor' => $m->actor?->name ?? $m->actor_reference ?? $m->source, 'Occurred at' => $m->occurred_at->setTimezone(config('sbm.timezone'))->format('Y-m-d H:i:sP')];
+                $map = fn ($m) => ['ID' => $m->id, 'SKU' => $m->item->sku, 'Type' => $m->type, 'Change' => $m->delta, 'Before' => $m->balance_before, 'After' => $m->balance_after, 'Reason' => $m->reason, 'Source' => $m->source, 'Reference' => $m->reference, 'Repair job' => $m->repair_job_reference, 'External line' => $m->line_id, 'Supplier' => $m->supplier?->name, 'Part brand' => $m->brand, 'Unit cost (sen)' => $m->allocated_unit_cost === null ? null : (int) $m->allocated_unit_cost, 'Total cost (sen)' => (int) $m->total_cost, 'Actor' => $m->actor?->name ?? $m->actor_reference ?? $m->source, 'Occurred at' => $m->occurred_at->setTimezone(config('sbm.timezone'))->format('Y-m-d H:i:sP')];
             }
         }
         if ($r->input('format') === 'csv') {
