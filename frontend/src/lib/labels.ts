@@ -32,6 +32,7 @@ export type LabelSymbol = {
 export async function labelSymbol(
   value: string,
   area: { widthMm: number; heightMm: number },
+  qrArea = area,
 ): Promise<LabelSymbol> {
   const library = await (writer ??= getWriter().catch((error) => {
     writer = undefined;
@@ -42,9 +43,10 @@ export async function labelSymbol(
   const formats: LabelSymbol["format"][] = /^[\x20-\x7e]{1,20}$/.test(value)
     ? ["Code128", "QRCode"]
     : ["QRCode"];
-  const availableWidth = Math.floor(area.widthMm * dotsPerMm);
-  const availableHeight = Math.floor(area.heightMm * dotsPerMm);
   for (const format of formats) {
+    const bounds = format === "QRCode" ? qrArea : area;
+    const availableWidth = Math.floor(bounds.widthMm * dotsPerMm);
+    const availableHeight = Math.floor(bounds.heightMm * dotsPerMm);
     const result = await library.writeBarcode(value, {
       format,
       scale: 1,

@@ -22,14 +22,20 @@ function StickerPreview({
   const [symbol, setSymbol] = useState<LabelSymbol | null>(null);
   const [error, setError] = useState("");
   const symbolHeight = Math.min(32, height - (sticker.serial ? 21 : 18));
+  // Landscape stock has room for text beside QR, freeing the full height
+  // for the code. Keep at least 18 mm for its human-readable details.
+  const qrSize = Math.min(32, height - 4, width - 23);
+  const sideBySide = width >= height * 1.5 && qrSize > symbolHeight;
+  const qrLayout = sideBySide && symbol?.format === "QRCode";
   useEffect(() => {
     let live = true;
     setSymbol(null);
     setError("");
-    labelSymbol(sticker.value, {
-      widthMm: width - 4,
-      heightMm: symbolHeight,
-    })
+    labelSymbol(
+      sticker.value,
+      { widthMm: width - 4, heightMm: symbolHeight },
+      sideBySide ? { widthMm: qrSize, heightMm: qrSize } : undefined,
+    )
       .then((value) => {
         if (live) setSymbol(value);
       })
@@ -39,12 +45,23 @@ function StickerPreview({
     return () => {
       live = false;
     };
-  }, [sticker.value, width, symbolHeight]);
+  }, [sticker.value, width, symbolHeight, sideBySide, qrSize]);
   return (
-    <article className="barcode-sticker" data-ready={!!symbol}>
+    <article
+      className={`barcode-sticker${qrLayout ? " barcode-sticker-qr" : ""}`}
+      data-ready={!!symbol}
+      style={
+        qrLayout
+          ? { gridTemplateColumns: `${qrSize}mm minmax(0, 1fr)` }
+          : undefined
+      }
+    >
       <strong>{item.name}</strong>
       <span>{item.sku}</span>
-      <div className="label-symbol" style={{ height: `${symbolHeight}mm` }}>
+      <div
+        className="label-symbol"
+        style={{ height: `${qrLayout ? qrSize : symbolHeight}mm` }}
+      >
         {symbol ? (
           <img
             className={symbol.format === "QRCode" ? "qr-label" : ""}
@@ -75,8 +92,8 @@ function StickerPreview({
 export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
   const [mode, setMode] = useState("product");
   const [copies, setCopies] = useState(1);
-  const [size, setSize] = useState("30x30");
-  const [customWidth, setCustomWidth] = useState("30");
+  const [size, setSize] = useState("50x30");
+  const [customWidth, setCustomWidth] = useState("50");
   const [customHeight, setCustomHeight] = useState("30");
   const [page, setPage] = useState(1);
   const [state, setState] = useState("available");

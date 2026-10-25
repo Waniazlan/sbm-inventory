@@ -61,3 +61,32 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.barcode-sticker-qr {
+  display: grid;
+  align-content: center;
+  column-gap: 1mm;
+  text-align: left;
+}
+.barcode-sticker-qr > strong,
+.barcode-sticker-qr > span {
+  grid-column: 2;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.barcode-sticker-qr > strong {
+  white-space: normal;
+  max-height: 2.4em;
+}
+.barcode-sticker-qr > span {
+  max-height: 2.4em;
+  overflow: hidden;
+}
+.barcode-sticker-qr > .label-symbol {
+  grid-column: 1;
+  grid-row: 1 / span 4;
+}
+.barcode-sticker-qr .label-product-code {
+  white-space: normal;
+  max-height: 2.4em;
+}

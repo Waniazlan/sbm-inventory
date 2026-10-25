@@ -122,17 +122,25 @@ async function expectPdfSize(
   }
 }
 
-test("XP-460B defaults to 30 × 30 mm and prints one readable code per sticker", async ({
+test("XP-460B defaults to 50 × 30 mm with a large readable QR beside the text", async ({
   page,
   context,
 }) => {
-  const barcode = "SBM-P-00000001";
+  const barcode = "SUPPLIER-ABCDEF12345";
   const dialog = await openLabels(page, barcode);
-  await expect(dialog.getByLabel("Sticker size")).toHaveValue("30x30");
+  await expect(dialog.getByLabel("Sticker size")).toHaveValue("50x30");
   await dialog.getByLabel("Number of stickers").fill("3");
   const popup = await printLabels(page, context, 3);
   await expect(popup.locator(".qr-label")).toHaveCount(3);
-  await expectPdfSize(popup, 30, 30, 3);
+  const qr = await popup.locator(".qr-label").first().boundingBox();
+  // At least 22 mm on the physical sticker (previously less than 12 mm).
+  expect((qr!.width * 25.4) / 96).toBeGreaterThanOrEqual(22);
+  expect(qr!.height).toBeCloseTo(qr!.width, 1);
+  await popup.locator(".barcode-sticker").first().screenshot({
+    path: test.info().outputPath("50x30-label.png"),
+    scale: "device",
+  });
+  await expectPdfSize(popup, 50, 30, 3);
   expect(await decodePrintedLabel(page, popup)).toBe(barcode);
   await popup.close();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -178,6 +186,7 @@ test("individual serials remain readable on 30 × 30 mm stock", async ({
 }) => {
   const serial = "屏幕-1234567890123-2";
   const dialog = await openLabels(page, "SBM-P-00000001", serial);
+  await dialog.getByLabel("Sticker size").selectOption("30x30");
   await dialog.getByLabel("Label type").selectOption("units");
   await dialog.getByLabel(`Print ${serial}`, { exact: true }).check();
   const popup = await printLabels(page, context, 1);
@@ -193,7 +202,8 @@ test("short identifiers keep a readable linear barcode on 30 × 30 mm stock", as
   context,
 }) => {
   const barcode = "123456";
-  await openLabels(page, barcode);
+  const dialog = await openLabels(page, barcode);
+  await dialog.getByLabel("Sticker size").selectOption("30x30");
   const popup = await printLabels(page, context, 1);
   await expect(popup.locator('img[alt^="Code128:"]')).toHaveCount(1);
   await expectPdfSize(popup, 30, 30, 1);
