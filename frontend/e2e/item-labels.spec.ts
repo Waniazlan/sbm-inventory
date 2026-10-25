@@ -44,6 +44,7 @@ test("store barcode, individual serials, printable stickers and exact serial loo
   const serial1 = `LCD-${Date.now()}-1`;
   const serial2 = `屏幕-${Date.now()}-2`;
   await dialog.getByLabel("Quantity", { exact: true }).fill("2");
+  await dialog.getByLabel("Receipt unit cost (MYR)").fill("12.00");
   await dialog.getByLabel("Source reference").fill(item.sku + "-LABEL-TEST");
   await dialog.getByLabel("Serial details").fill(`${serial1}\n${serial2}`);
   const receiving = page.waitForResponse(

@@ -5,12 +5,12 @@ import { money, type Item, type Page } from "../api";
 
 import { ItemLabels } from "../components/ItemLabels";
 import { ItemForm } from "../components/ItemForm";
+import { ItemDetails } from "../components/ItemDetails";
 import { BarcodeScanner } from "../components/BarcodeScanner";
 import {
   Button,
   Empty,
   Heading,
-  Modal,
   Pager,
   Status,
   StockBadge,
@@ -173,13 +173,16 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                       <td>{money(i.price)}</td>
                       <td>
                         <div className="row-actions">
-                          <Button variant="quiet" onClick={() => setLabels(i)}>
+                          <Button
+                            variant="secondary"
+                            onClick={() => setLabels(i)}
+                          >
                             Labels &amp; serials
                           </Button>
                           {user.role === "admin" ? (
                             <>
                               <Button
-                                variant="quiet"
+                                variant="secondary"
                                 onClick={() => setEdit(i)}
                               >
                                 Edit
@@ -255,50 +258,15 @@ export function Catalogue({ low = false }: { low?: boolean }) {
         <StockForm {...stock} close={() => setStock(null)} done={q.reload} />
       )}{" "}
       {detail && (
-        <Modal
-          title={detail.name}
-          subtitle={detail.sku}
+        <ItemDetails
+          key={detail.id}
+          item={detail}
           close={() => setDetail(null)}
-        >
-          <div className="detail-grid">
-            {Object.entries({
-              Status: detail.active ? "Active" : "Inactive",
-              Barcode: detail.barcode || "Not assigned",
-              Stock: `${detail.stock} ${detail.unit}(s)`,
-              Brand: detail.brand,
-              Part: detail.part_number,
-              Colour: detail.colour,
-              Grade: detail.grade,
-              Capacity: detail.capacity,
-              Supplier: detail.supplier?.name,
-              "Selling price": money(detail.price),
-              ...(user.role === "admin"
-                ? { "Standard cost": money(detail.cost) }
-                : {}),
-              Notes: detail.notes,
-            }).map(([k, v]) => (
-              <div key={k}>
-                <small>{k}</small>
-                <strong>{v || "—"}</strong>
-              </div>
-            ))}
-          </div>
-          <div className="modal-footer">
-            {user.role === "admin" && (
-              <Button
-                onClick={() => {
-                  setStock({ kind: "manual_out", item: detail });
-                  setDetail(null);
-                }}
-              >
-                Issue or adjust stock
-              </Button>
-            )}
-            <Button variant="secondary" onClick={() => setDetail(null)}>
-              Close
-            </Button>
-          </div>
-        </Modal>
+          issue={(item) => {
+            setStock({ kind: "manual_out", item });
+            setDetail(null);
+          }}
+        />
       )}
     </>
   );

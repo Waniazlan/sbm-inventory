@@ -27,7 +27,6 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await dialog
     .getByLabel("Component category")
     .selectOption({ label: "Battery" });
-  await dialog.getByLabel("Standard cost (MYR)").fill("12.00");
   await dialog.getByLabel("Selling price (MYR)").fill("25.00");
   await dialog.getByLabel("Minimum stock").fill("2");
   const createdResponse = page.waitForResponse(
@@ -45,6 +44,7 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
   await expect(row).toBeVisible();
   await row.getByRole("button", { name: "Receive", exact: true }).click();
   await dialog.getByLabel("Quantity", { exact: true }).fill("10");
+  await dialog.getByLabel("Receipt unit cost (MYR)").fill("12.00");
   await dialog.getByLabel("Source reference").fill(sku);
   await dialog.getByRole("button", { name: "Receive stock" }).click();
   await expect(dialog).not.toBeVisible();

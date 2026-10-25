@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Camera, ChevronDown } from "lucide-react";
+import { Camera } from "lucide-react";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { BARCODE_MAX_LENGTH, BARCODE_PATTERN } from "../lib/barcode";
 
@@ -33,14 +33,11 @@ export function ItemForm({
       serial_tracking: form.get("serial_tracking") === "on",
       name: text("name"),
       category_id: Number(text("category_id")),
-      supplier_id: text("supplier_id") ? Number(text("supplier_id")) : null,
       brand: text("brand"),
-      part_number: text("part_number"),
       colour: text("colour"),
       grade: text("grade"),
       capacity: text("capacity"),
       unit: text("unit"),
-      cost: Math.round(Number(text("cost")) * 100),
       price: text("price") ? Math.round(Number(text("price")) * 100) : null,
       minimum_stock: Number(text("minimum_stock")),
       active: form.get("active") === "on",
@@ -176,33 +173,6 @@ export function ItemForm({
                 defaultValue={item?.brand || ""}
               />
             </Field>
-            <Field label="Supplier name">
-              <div className="supplier-dropdown">
-                <select
-                  name="supplier_id"
-                  defaultValue={item?.supplier_id || ""}
-                >
-                  <option value="">Select supplier</option>
-                  {meta.suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} aria-hidden="true" />
-              </div>
-            </Field>
-            <Field label="Standard cost (MYR)">
-              <input
-                name="cost"
-                required
-                type="number"
-                min="0"
-                max="1000000"
-                step="0.01"
-                defaultValue={(item?.cost || 0) / 100}
-              />
-            </Field>
             <Field label="Selling price (MYR)">
               <input
                 name="price"
@@ -231,17 +201,11 @@ export function ItemForm({
                 <option>pack</option>
               </select>
             </Field>
-            {(["part_number", "colour", "capacity", "grade"] as const).map(
-              (k) => (
-                <Field label={label(k)} key={k}>
-                  <input
-                    name={k}
-                    maxLength={80}
-                    defaultValue={item?.[k] || ""}
-                  />
-                </Field>
-              ),
-            )}
+            {(["colour", "capacity", "grade"] as const).map((k) => (
+              <Field label={label(k)} key={k}>
+                <input name={k} maxLength={80} defaultValue={item?.[k] || ""} />
+              </Field>
+            ))}
             <div className="field wide">
               <span>Compatible phone models</span>
               <div className="checkbox-list">

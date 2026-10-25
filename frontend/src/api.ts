@@ -45,6 +45,7 @@ export type Item = {
   capacity: string | null;
   unit: string;
   cost?: number;
+  stock_value?: number;
   price: number | null;
   minimum_stock: number;
   stock: number;
@@ -56,6 +57,13 @@ export type ItemUnit = {
   item_id: number;
   serial_number: string;
   in_stock: boolean;
+};
+export type ItemDetail = Item & {
+  supplier_stock: {
+    supplier_id: number | null;
+    supplier_name: string | null;
+    quantity: number;
+  }[];
 };
 export type Movement = {
   serials?: string | null;
@@ -73,7 +81,9 @@ export type Movement = {
   occurred_at: string;
   reversal: { id: number } | null;
   reverses_id: number | null;
-  unit_cost?: number;
+  unit_cost?: number | null;
+  total_cost?: number;
+  supplier?: Named | null;
 };
 export type Job = {
   id: number;

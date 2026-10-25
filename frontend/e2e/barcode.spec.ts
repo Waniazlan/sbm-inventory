@@ -132,7 +132,14 @@ async function setup(
       const data =
         query.has("barcode") && query.get("barcode") !== barcode ? [] : [item];
       body = { data, total: data.length, current_page: 1, last_page: 1 };
-    } else if (route.request().method() === "POST")
+    } else if (path.endsWith("/items/1") && route.request().method() === "GET")
+      body = {
+        ...item,
+        supplier_stock: [
+          { supplier_id: null, supplier_name: null, quantity: item.stock },
+        ],
+      };
+    else if (route.request().method() === "POST")
       body = { ...item, ...route.request().postDataJSON(), sku: "PRN-000001" };
     else return route.abort();
     await route.fulfill({ json: body });
@@ -444,6 +451,8 @@ test("existing item SKU is read-only and excluded from updates", async ({
   await expect(sku).toHaveAttribute("readonly", "");
   await page.route("**/api/v1/items/1", async (route) => {
     expect(route.request().postDataJSON()).not.toHaveProperty("sku");
+    expect(route.request().postDataJSON()).not.toHaveProperty("supplier_id");
+    expect(route.request().postDataJSON()).not.toHaveProperty("cost");
     await route.fulfill({ json: item });
   });
   await page.getByRole("button", { name: "Save item" }).click();
@@ -464,6 +473,10 @@ for (const [format, file, serial] of [
         fixtureImage(file),
       );
       await page.getByRole("button", { name: "Receive", exact: true }).click();
+      await page
+        .getByRole("dialog")
+        .getByLabel("Receipt unit cost (MYR)")
+        .fill("0");
       const receipt = page.getByRole("dialog").filter({
         has: page.getByRole("heading", {
           name: "Receive stock",
@@ -517,6 +530,10 @@ test("serial scanner cancellation, duplicates and length limit preserve receipt 
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page, "photo", fixtureImage("barcode-code128-ABC-123.svg"));
   await page.getByRole("button", { name: "Receive", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Receipt unit cost (MYR)")
+    .fill("0");
   const receipt = page.getByRole("dialog").filter({
     has: page.getByRole("heading", { name: "Receive stock", exact: true }),
   });
@@ -573,6 +590,10 @@ test("receipt form groups fields and keeps actions visible across desktop and mo
 }, testInfo) => {
   await setup(page, "denied");
   await page.getByRole("button", { name: "Receive", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Receipt unit cost (MYR)")
+    .fill("0");
   const receipt = page.getByRole("dialog");
   for (const title of ["Delivery details", "Items"]) {
     await expect(
@@ -642,6 +663,10 @@ test("multiple receipt items can be added, removed and scanned separately before
 }, testInfo) => {
   await setup(page, "denied");
   await page.getByRole("button", { name: "Receive", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Receipt unit cost (MYR)")
+    .fill("0");
   const receipt = page.getByRole("dialog");
   const row1 = receipt.getByRole("group", { name: "Item 1", exact: true });
   await expect(
@@ -666,6 +691,7 @@ test("multiple receipt items can be added, removed and scanned separately before
   await row2
     .getByRole("combobox", { name: "Item", exact: true })
     .selectOption("2");
+  await receipt.getByLabel("Receipt unit cost (MYR)").nth(1).fill("0");
   await row2.getByLabel("Quantity", { exact: true }).fill("3");
   await row2.getByLabel("Receipt unit cost (MYR)").fill("55.00");
   await row2.getByRole("button", { name: "Scan serial", exact: true }).click();
@@ -749,6 +775,10 @@ test("uncertain multi-item receipt retries the identical payload and locks editi
     );
   });
   await page.getByRole("button", { name: "Receive", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Receipt unit cost (MYR)")
+    .fill("0");
   const receipt = page.getByRole("dialog");
   await receipt.getByLabel("Source reference").fill("RETRY-100");
   await receipt.getByRole("button", { name: "Add item", exact: true }).click();
@@ -756,6 +786,7 @@ test("uncertain multi-item receipt retries the identical payload and locks editi
     .getByRole("group", { name: "Item 2", exact: true })
     .getByRole("combobox", { name: "Item", exact: true })
     .selectOption("2");
+  await receipt.getByLabel("Receipt unit cost (MYR)").nth(1).fill("0");
   await receipt
     .getByRole("button", { name: "Receive stock", exact: true })
     .click();
@@ -791,6 +822,10 @@ test("row validation errors preserve receipt details and allow correction with a
     );
   });
   await page.getByRole("button", { name: "Receive", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByLabel("Receipt unit cost (MYR)")
+    .fill("0");
   const receipt = page.getByRole("dialog");
   await receipt.getByLabel("Source reference").fill("VALIDATE-100");
   await receipt.getByRole("button", { name: "Add item", exact: true }).click();
@@ -798,6 +833,7 @@ test("row validation errors preserve receipt details and allow correction with a
   await row2
     .getByRole("combobox", { name: "Item", exact: true })
     .selectOption("2");
+  await receipt.getByLabel("Receipt unit cost (MYR)").nth(1).fill("0");
   await receipt
     .getByRole("button", { name: "Receive stock", exact: true })
     .click();

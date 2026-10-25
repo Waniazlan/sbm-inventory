@@ -7,7 +7,7 @@ import {
   TriangleAlert,
   X,
 } from "lucide-react";
-import { label, type Item, type Movement, type Page } from "../api";
+import { label, money, type Item, type Movement, type Page } from "../api";
 
 import { useApp } from "../hooks";
 export function Button({
@@ -211,6 +211,8 @@ export function MovementTable({
   rows: Movement[];
   onReverse?: (m: Movement) => void;
 }) {
+  const { user } = useApp();
+  const showCost = user.role === "admin";
   return rows.length ? (
     <div className="table-scroll">
       <table>
@@ -221,6 +223,7 @@ export function MovementTable({
             <th>Quantity</th>
             <th>Balance</th>
             <th>Reference / reason</th>
+            {showCost && <th>Cost</th>}
             <th>Recorded by</th>
             <th>Date</th>
             {onReverse && <th />}
@@ -251,7 +254,18 @@ export function MovementTable({
               <td>
                 <strong>{m.reference || "Manual entry"}</strong>
                 <small>{m.reason}</small>
+                {m.supplier && <small>{m.supplier.name}</small>}
               </td>
+              {showCost && (
+                <td>
+                  <strong>{money(m.total_cost)}</strong>
+                  <small>
+                    {m.unit_cost == null
+                      ? "Multiple batch costs"
+                      : `${money(m.unit_cost)} / unit`}
+                  </small>
+                </td>
+              )}
               <td>{m.actor?.name || m.actor_reference || m.source}</td>
               <td className="date">
                 <Time value={m.occurred_at} />

@@ -184,6 +184,10 @@ export function ReceiptForm({
                   <Plus size={16} /> Add item
                 </Button>
               </div>
+              <p className="muted">
+                Select the supplier for this delivery and enter the actual
+                purchase cost on each item row.
+              </p>
               <ErrorBox message={products.error} />
               {products.error && (
                 <Button
@@ -261,7 +265,8 @@ export function ReceiptForm({
                           min="0"
                           max="1000000"
                           step="0.01"
-                          placeholder="Optional"
+                          required
+                          placeholder="Enter purchase cost"
                           value={line.cost}
                           onChange={(event) =>
                             updateLine(line.key, { cost: event.target.value })
