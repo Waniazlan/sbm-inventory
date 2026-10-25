@@ -183,6 +183,7 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
           <Field label="Sticker size (one label)">
             <select value={size} onChange={(e) => setSize(e.target.value)}>
               <option value="30x30">30 × 30 mm</option>
+              <option value="35x35">35 × 35 mm</option>
               <option value="50x30">50 × 30 mm</option>
               <option value="60x40">60 × 40 mm</option>
               <option value="80x50">80 × 50 mm</option>
