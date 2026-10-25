@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Audit;
 use App\Services\StockCosts;
+use App\Services\SupplierStock;
 use App\Services\UnitSerials;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
@@ -84,23 +85,22 @@ class CatalogueController
     public function show(Request $r, Item $item)
     {
         $detail = self::present($item->load(['category', 'supplier', 'phoneModels'])->loadSum('batches as stock_value', DB::raw('remaining_quantity::bigint * unit_cost')), $r->user()->role === 'admin');
-        $detail['supplier_stock'] = $item->batches()
-            ->leftJoin('movements as receipt', 'receipt.id', '=', 'stock_batches.receipt_movement_id')
-            ->select('stock_batches.supplier_id', 'receipt.brand')
-            ->selectRaw('SUM(stock_batches.remaining_quantity) AS quantity')
-            ->where('stock_batches.remaining_quantity', '>', 0)
-            ->groupBy('stock_batches.supplier_id', 'receipt.brand')
-            ->orderBy('stock_batches.supplier_id')->orderBy('receipt.brand')
-            ->with('supplier:id,name')->get()
-            ->groupBy(fn ($batch) => $batch->supplier_id ?? 'unknown')
-            ->map(fn ($batches) => [
-                'supplier_id' => $batches->first()->supplier_id,
-                'supplier_name' => $batches->first()->supplier?->name,
-                'quantity' => (int) $batches->sum('quantity'),
-                'brands' => $batches->map(fn ($batch) => ['brand' => $batch->brand, 'quantity' => (int) $batch->quantity])->values(),
-            ])->values();
+        $detail['supplier_stock'] = app(SupplierStock::class)->summary($item, $r->user()->role === 'admin');
 
         return $detail;
+    }
+
+    public function editSupplierStock(Request $r, Item $item, SupplierStock $stock)
+    {
+        $data = $r->validate([
+            'request_key' => 'required|uuid', 'supplier_id' => 'present|nullable|integer|exists:suppliers,id',
+            'original_brand' => 'present|nullable|string|max:100', 'brand' => 'present|nullable|string|max:100',
+            'edit_token' => 'required|string|size:64', 'counted_quantity' => 'required|integer|min:0|max:100000000',
+            'reason' => 'required|string|min:3|max:500', 'serials' => 'nullable|string|max:130000',
+        ]);
+        $data['supplier_id'] = $data['supplier_id'] === null ? null : (int) $data['supplier_id'];
+
+        return $stock->edit($item, $data, $r->user()->id);
     }
 
     public function options()

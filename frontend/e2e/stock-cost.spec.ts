@@ -182,6 +182,76 @@ test("different intake suppliers retain their batch costs through FIFO usage and
     await expect(
       supplierStock.getByRole("row").filter({ hasText: "Total on hand" }),
     ).toContainText("3 piece(s)");
+    const supplierRow = supplierStock
+      .getByRole("row")
+      .filter({ hasText: suppliers[1].name });
+    await supplierRow
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
+    const editor = dialog.getByRole("form", { name: "Edit supplier stock" });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await editor.getByLabel("Part brand").fill("Corrected intake brand");
+    await editor.getByLabel("On-hand quantity").fill("2");
+    await editor
+      .getByLabel("Reason for change")
+      .fill("Browser supplier stock count correction");
+    await page.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: "../docs/screenshots/supplier-stock-editor-mobile.png",
+      fullPage: true,
+    });
+    await expect(
+      dialog.getByRole("button", { name: "Close dialog", exact: true }),
+    ).toBeInViewport();
+    const saving = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/items/${item.id}/supplier-stock`) &&
+        response.request().method() === "PUT",
+    );
+    await editor
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    const editResponse = await saving;
+    expect(editResponse.ok()).toBe(true);
+    const saved = await editResponse.json();
+    movements.push(saved.adjustment.movements[0].id);
+    await expect(editor).not.toBeVisible();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await expect(supplierRow).toContainText("Corrected intake brand");
+    await expect(supplierRow).toContainText("2 piece(s)");
+    await expect(
+      supplierStock.getByRole("row").filter({ hasText: "Total on hand" }),
+    ).toContainText("2 piece(s)");
+    await supplierRow
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
+    await editor.getByLabel("On-hand quantity").fill("3");
+    await expect(editor).toContainText("RM 135.00");
+    await editor
+      .getByLabel("Reason for change")
+      .fill("Browser supplier stock recount");
+    const increasing = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`/items/${item.id}/supplier-stock`) &&
+        response.request().method() === "PUT",
+    );
+    await editor
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    const increaseResponse = await increasing;
+    expect(increaseResponse.ok()).toBe(true);
+    movements.push((await increaseResponse.json()).adjustment.movements[0].id);
+    await expect(editor).not.toBeVisible();
+    await expect(supplierRow).toContainText("3 piece(s)");
+    await page.screenshot({
+      path: "../docs/screenshots/supplier-stock-edited-desktop.png",
+      fullPage: true,
+    });
     await dialog.press("Escape");
     await expect(dialog).not.toBeVisible();
     await page.getByRole("link", { name: "Movement ledger" }).click();

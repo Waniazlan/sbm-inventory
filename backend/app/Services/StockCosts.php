@@ -26,7 +26,7 @@ class StockCosts
         StockBatch::create(['item_id' => $item->id, 'supplier_id' => $item->supplier_id, 'reference' => 'Opening stock without receipt history', 'cost_source' => 'opening_standard_cost', 'unit_cost' => $item->cost, 'quantity' => $quantity, 'remaining_quantity' => $quantity, 'received_at' => $item->created_at ?? now()]);
     }
 
-    public function plan(Item $item, Movement $movement, ?Movement $reversal = null): array
+    public function plan(Item $item, Movement $movement, ?Movement $reversal = null, ?array $batchIds = null): array
     {
         if ($reversal) {
             $plan = $reversal->costAllocations()->with('batch')->orderBy('id')->get()->map(fn ($a) => ['batch' => $a->batch, 'quantity' => -$a->quantity, 'return_of_id' => $a->return_of_id])->all();
@@ -52,12 +52,15 @@ class StockCosts
         $remaining = $movement->quantity;
         // A scanned physical unit always takes its own batch, even if it is newer.
         foreach ($units->whereNotNull('stock_batch_id')->groupBy('stock_batch_id') as $id => $group) {
+            if ($batchIds !== null && ! in_array($id, $batchIds)) {
+                $this->fail('The selected serial belongs to a different supplier or brand.');
+            }
             $batch = StockBatch::where('item_id', $item->id)->findOrFail($id);
             $plan[$id] = ['batch' => $batch, 'quantity' => -$group->count(), 'return_of_id' => null];
             $remaining -= $group->count();
         }
         // FIFO follows posting order; backdated paperwork must not rewrite previous costs.
-        foreach ($item->batches()->where('remaining_quantity', '>', 0)->orderBy('id')->get() as $batch) {
+        foreach ($item->batches()->where('remaining_quantity', '>', 0)->when($batchIds !== null, fn ($q) => $q->whereIn('id', $batchIds))->orderBy('id')->get() as $batch) {
             $reserved = isset($plan[$batch->id]) ? -$plan[$batch->id]['quantity'] : 0;
             $take = min($remaining, $batch->remaining_quantity - $reserved);
             if ($take > 0) {

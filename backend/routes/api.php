@@ -31,6 +31,7 @@ Route::prefix('v1')->group(function () {
             Route::get('items/{item}/batches', [CatalogueController::class, 'batches'])->whereNumber('item');
             Route::post('items', [CatalogueController::class, 'save']);
             Route::post('items/generate-barcode', [CatalogueController::class, 'generateBarcode']);
+            Route::put('items/{item}/supplier-stock', [CatalogueController::class, 'editSupplierStock'])->whereNumber('item');
             Route::put('items/{item}', [CatalogueController::class, 'save'])->whereNumber('item');
             Route::post('metadata/{kind}', [CatalogueController::class, 'createMetadata']);
             Route::get('users', [CatalogueController::class, 'users']);

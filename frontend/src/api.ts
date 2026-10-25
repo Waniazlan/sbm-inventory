@@ -58,12 +58,18 @@ export type ItemUnit = {
   serial_number: string;
   in_stock: boolean;
 };
+export type SupplierStockEntry = {
+  brand: string | null;
+  quantity: number;
+  edit_token?: string;
+  latest_unit_cost?: number;
+};
 export type ItemDetail = Item & {
   supplier_stock: {
     supplier_id: number | null;
     supplier_name: string | null;
     quantity: number;
-    brands: { brand: string | null; quantity: number }[];
+    brands: SupplierStockEntry[];
   }[];
 };
 export type Movement = {

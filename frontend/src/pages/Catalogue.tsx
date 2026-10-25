@@ -261,6 +261,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
         <ItemDetails
           key={detail.id}
           item={detail}
+          changed={q.reload}
           close={() => setDetail(null)}
           issue={(item) => {
             setStock({ kind: "manual_out", item });

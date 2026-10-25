@@ -79,7 +79,7 @@ class StockCostTest extends TestCase
         $this->record('manual_out', 4);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()
             ->assertJsonPath('stock', 7)
-            ->assertJsonPath('supplier_stock', [
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [
                 ['supplier_id' => $this->supplier->id, 'supplier_name' => 'Supplier A', 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]],
                 ['supplier_id' => $other->id, 'supplier_name' => 'Supplier B', 'quantity' => 4, 'brands' => [['brand' => null, 'quantity' => 4]]],
                 ['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]],
@@ -89,12 +89,12 @@ class StockCostTest extends TestCase
             ->assertJsonCount(2, 'supplier_stock')->assertJsonPath('supplier_stock.0.supplier_id', $other->id);
         $this->record('reversal', 4, ['movement_id' => $receiptB->id]);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 2)
-            ->assertJsonPath('supplier_stock', [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]]]);
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]]]);
     }
 
     public function test_product_details_with_no_stock_have_an_empty_supplier_breakdown(): void
     {
-        $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 0)->assertJsonPath('supplier_stock', []);
+        $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 0)->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === []);
     }
 
     public function test_product_details_show_receipt_brands_per_supplier_and_remaining_quantities(): void
@@ -107,8 +107,8 @@ class StockCostTest extends TestCase
         $issue = $this->record('manual_out', 3);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()
             ->assertJsonPath('supplier_stock.0.quantity', 6)
-            ->assertJsonPath('supplier_stock.0.brands', [['brand' => 'Brand A', 'quantity' => 2], ['brand' => 'Brand B', 'quantity' => 4]])
-            ->assertJsonPath('supplier_stock.1.brands', [['brand' => 'Brand A', 'quantity' => 1]]);
+            ->assertJsonPath('supplier_stock.0.brands.0.brand', 'Brand A')->assertJsonPath('supplier_stock.0.brands.0.quantity', 2)->assertJsonPath('supplier_stock.0.brands.1.brand', 'Brand B')->assertJsonPath('supplier_stock.0.brands.1.quantity', 4)
+            ->assertJsonPath('supplier_stock.1.brands.0.brand', 'Brand A')->assertJsonPath('supplier_stock.1.brands.0.quantity', 1);
         $this->record('reversal', 3, ['movement_id' => $issue->id]);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()
             ->assertJsonPath('supplier_stock.0.brands.0.quantity', 5);
@@ -237,7 +237,7 @@ class StockCostTest extends TestCase
         $this->getJson('/api/v1/items/'.$this->item->id.'/batches')->assertForbidden();
         $this->getJson('/api/v1/items')->assertJsonMissingPath('data.0.cost')->assertJsonMissingPath('data.0.stock_value');
         $this->getJson('/api/v1/items/'.$this->item->id)->assertJsonMissingPath('cost')->assertJsonMissingPath('stock_value')
-            ->assertJsonPath('supplier_stock', [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]]])
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]]])
             ->assertJsonMissingPath('supplier_stock.0.unit_cost');
         $this->getJson('/api/v1/dashboard')->assertJsonPath('valuation', null);
     }

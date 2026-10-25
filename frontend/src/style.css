@@ -1543,3 +1543,60 @@ dialog textarea:focus {
   border-top: 1px solid var(--border);
   border-bottom: 0;
 }
+
+.supplier-stock-editor {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #f7faf7;
+}
+.supplier-stock-editor h4 {
+  margin: 0 0 16px;
+  color: var(--green);
+}
+.supplier-stock-editor fieldset {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+}
+.supplier-stock-editor fieldset > .wide {
+  grid-column: 1 / -1;
+}
+.supplier-stock-editor .row-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.supplier-stock-editor .notice {
+  margin: 0;
+}
+.supplier-stock-actions {
+  margin-top: 8px;
+}
+.supplier-stock-actions .button {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+@media (max-width: 480px) {
+  .supplier-stock-editor fieldset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+dialog.item-details-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.item-details-dialog > .modal-head,
+.item-details-dialog > .modal-footer {
+  flex-shrink: 0;
+}
+.item-details-body {
+  min-height: 0;
+  overflow-y: auto;
+}
