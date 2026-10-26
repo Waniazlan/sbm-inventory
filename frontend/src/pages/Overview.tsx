@@ -1,9 +1,7 @@
 import { useState } from "react";
 
 import {
-  ArrowDownToLine,
   ArrowRight,
-  ArrowUpFromLine,
   BarChart3,
   Layers,
   Package,
@@ -97,9 +95,7 @@ export function Overview() {
                 </div>
               ))}
             </div>
-            <div
-              className={`overview-grid${user.role === "admin" ? "" : " overview-grid-readonly"}`}
-            >
+            <div className="overview-grid">
               <section className="panel">
                 <div className="panel-title">
                   <div>
@@ -140,38 +136,6 @@ export function Overview() {
                   />
                 )}
               </section>
-              {user.role === "admin" && (
-                <section
-                  className="panel stock-actions"
-                  aria-labelledby="stock-actions-heading"
-                >
-                  <div className="panel-title">
-                    <div>
-                      <h2 id="stock-actions-heading">Stock actions</h2>
-                      <p>Record receipts, issues and stock counts.</p>
-                    </div>
-                  </div>
-                  <div className="stock-actions-body">
-                    <div className="stock-actions-buttons">
-                      <Button onClick={() => setAction("receipt")}>
-                        <ArrowDownToLine size={18} />
-                        Receive stock
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setAction("manual_out")}
-                      >
-                        <ArrowUpFromLine size={18} />
-                        Issue or adjust
-                      </Button>
-                    </div>
-                    <div className="ledger-mark">
-                      <ShieldCheck size={17} />
-                      Permanent movement history
-                    </div>
-                  </div>
-                </section>
-              )}
             </div>
             <section className="panel">
               <div className="panel-title">

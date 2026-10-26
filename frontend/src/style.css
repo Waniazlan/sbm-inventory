@@ -382,8 +382,7 @@ strong {
 }
 .overview-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr);
   margin-bottom: 24px;
   align-items: start;
 }
@@ -393,9 +392,6 @@ strong {
   border-radius: 8px;
   overflow: hidden;
   min-width: 0;
-}
-.overview-grid-readonly {
-  grid-template-columns: minmax(0, 1fr);
 }
 .panel-title {
   padding: 20px 24px;
@@ -479,30 +475,6 @@ strong {
 .neutral {
   background: #f0f3f1;
   color: #819087;
-}
-/* Stock actions share the same flat panel treatment as the ledger. */
-.stock-actions-body {
-  padding: 20px 24px;
-}
-.stock-actions-buttons {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-}
-.stock-actions-buttons .button {
-  justify-content: flex-start;
-}
-.ledger-mark {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin-top: 20px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.ledger-mark svg {
-  flex-shrink: 0;
 }
 .table-scroll {
   overflow-x: auto;
@@ -1281,8 +1253,6 @@ dialog.receipt-multi-dialog[open] {
     font-size: 10px;
   }
   .overview-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
     margin-bottom: 18px;
   }
   .panel-title {
@@ -1298,9 +1268,6 @@ dialog.receipt-multi-dialog[open] {
   }
   .attention-list .badge {
     font-size: 10px;
-  }
-  .stock-actions-body {
-    padding: 18px;
   }
   .toolbar {
     padding: 16px;

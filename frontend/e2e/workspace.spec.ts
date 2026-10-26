@@ -45,10 +45,8 @@ test("live Inventory pages and dialogs fit the Sales-style workspace", async ({
     ).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("alert")).toHaveCount(0);
   }
-  await page
-    .getByRole("region", { name: "Stock actions" })
-    .getByRole("button", { name: "Receive stock" })
-    .click();
+  await expect(page.getByRole("region", { name: "Stock actions" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Receive stock" }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.getByRole("button", { name: "Close dialog" }).click();
   await navigation
