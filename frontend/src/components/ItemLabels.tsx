@@ -7,7 +7,7 @@ import "./item-labels.css";
 import stickerStyles from "./item-labels.css?inline";
 import { Button, Empty, ErrorBox, Field, Modal, Pager, Status } from "./shared";
 
-type Sticker = { value: string; serial?: string };
+type Sticker = { value: string; serial?: string; brand?: string | null };
 function StickerPreview({
   item,
   sticker,
@@ -21,6 +21,7 @@ function StickerPreview({
 }) {
   const [symbol, setSymbol] = useState<LabelSymbol | null>(null);
   const [error, setError] = useState("");
+  const brand = sticker.serial ? sticker.brand?.trim() : undefined;
   const symbolHeight = Math.min(32, height - (sticker.serial ? 21 : 18));
   // Landscape stock has room for text beside QR, freeing the full height
   // for the code. Keep at least 18 mm for its human-readable details.
@@ -48,7 +49,7 @@ function StickerPreview({
   }, [sticker.value, width, symbolHeight, sideBySide, qrSize]);
   return (
     <article
-      className={`barcode-sticker${qrLayout ? " barcode-sticker-qr" : ""}`}
+      className={`barcode-sticker${qrLayout ? " barcode-sticker-qr" : ""}${brand ? " barcode-sticker-branded" : ""}`}
       data-ready={!!symbol}
       style={
         qrLayout
@@ -57,7 +58,8 @@ function StickerPreview({
       }
     >
       <strong>{item.name}</strong>
-      <span>{item.sku}</span>
+      {brand && <span className="label-brand">{brand}</span>}
+      <span className="label-sku">{item.sku}</span>
       <div
         className="label-symbol"
         style={{ height: `${qrLayout ? qrSize : symbolHeight}mm` }}
@@ -112,6 +114,7 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
       : selected.map((unit) => ({
           value: unit.serial_number,
           serial: unit.serial_number,
+          brand: unit.brand,
         }));
   const [width, height] =
     size === "custom"

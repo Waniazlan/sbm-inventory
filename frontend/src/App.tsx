@@ -12,7 +12,6 @@ import {
   Plug,
   Settings,
   TriangleAlert,
-  Wrench,
   X,
 } from "lucide-react";
 import {
@@ -32,7 +31,6 @@ import { Catalogue } from "./pages/Catalogue";
 import { Integrations } from "./pages/Integrations";
 import { Movements } from "./pages/Movements";
 import { Overview } from "./pages/Overview";
-import { Repairs } from "./pages/Repairs";
 import { Reports } from "./pages/Reports";
 import { SettingsPage } from "./pages/SettingsPage";
 export { Login } from "./pages/Login";
@@ -99,7 +97,6 @@ export function Shell({
     { to: "/", name: "Overview", icon: LayoutDashboard },
     { to: "/catalogue", name: "Item catalogue", icon: Package },
     { to: "/movements", name: "Movement ledger", icon: ArrowLeftRight },
-    { to: "/repairs", name: "Repair parts", icon: Wrench },
     { to: "/low-stock", name: "Low-stock watch", icon: TriangleAlert },
     { to: "/reports", name: "Reports", icon: BarChart3, admin: true },
     { to: "/integrations", name: "Integrations", icon: Plug, admin: true },
@@ -207,7 +204,6 @@ export function Shell({
                     element={<Catalogue low key="low" />}
                   />
                   <Route path="/movements" element={<Movements />} />
-                  <Route path="/repairs" element={<Repairs />} />
                   {user.role === "admin" && (
                     <>
                       <Route path="/reports" element={<Reports />} />

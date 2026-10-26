@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Item extends Model
 {
+    use SoftDeletes;
+
     protected $guarded = ['id'];
 
     protected static function booted(): void
@@ -19,8 +22,8 @@ class Item extends Model
                 // PostgreSQL sequences allocate distinct numbers across requests
                 // and do not reuse numbers after a failed save or rollback.
                 $number = $item->getConnection()->selectOne("SELECT nextval('inventory_item_sku_seq') AS number")->number;
-                $sku = sprintf('PRN-%06d', $number);
-            } while ($item->newQuery()->where('sku', $sku)->exists());
+                $sku = sprintf('%s-%06d', app(LabelSetting::class)->sku_prefix, $number);
+            } while ($item->newQuery()->withTrashed()->where('sku', $sku)->exists());
 
             $item->sku = $sku;
         });

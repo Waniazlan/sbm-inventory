@@ -6,7 +6,6 @@ use App\Models\Item;
 use App\Models\ItemUnit;
 use App\Models\Movement;
 use App\Models\Operation;
-use App\Models\RepairJob;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -48,8 +47,7 @@ class Ledger
                     return $existing->response;
                 }
                 if ($data['kind'] === 'repair_usage' && $source === 'inventory') {
-                    $job = RepairJob::where('reference', $data['reference'])->lockForUpdate()->first();
-                    abort_unless($job && $job->active && (auth()->user()->role === 'admin' || $job->technician_id === $actor), 403, 'Use an active repair assigned to you.');
+                    abort(422, 'Record repair parts usage in SBM Tracking.');
                 }
                 $reversal = null;
                 if ($data['kind'] === 'reversal') {

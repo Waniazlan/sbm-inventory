@@ -10,7 +10,6 @@ import {
   Plus,
   ShieldCheck,
   TriangleAlert,
-  Wrench,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { money, type Item, type Movement } from "../api";
@@ -42,15 +41,10 @@ export function Overview() {
         title="Stock overview"
         subtitle="A clear picture of your parts, stock and daily movements."
         actions={
-          user.role === "admin" ? (
+          user.role === "admin" && (
             <Button onClick={() => setAction("receipt")}>
               <Plus size={17} />
               Receive stock
-            </Button>
-          ) : (
-            <Button onClick={() => setAction("repair_usage")}>
-              <Wrench size={17} />
-              Record usage
             </Button>
           )
         }
@@ -86,11 +80,11 @@ export function Overview() {
                     user.role === "admin"
                       ? money(q.data.valuation)
                       : "Technician",
-                  icon: user.role === "admin" ? BarChart3 : Wrench,
+                  icon: user.role === "admin" ? BarChart3 : ShieldCheck,
                   note:
                     user.role === "admin"
                       ? "At current standard cost"
-                      : "Assigned repair consumption",
+                      : "Stock availability and movement history",
                 },
               ].map((s) => (
                 <div className={`stat ${s.warn ? "warn" : ""}`} key={s.name}>
@@ -103,7 +97,9 @@ export function Overview() {
                 </div>
               ))}
             </div>
-            <div className="overview-grid">
+            <div
+              className={`overview-grid${user.role === "admin" ? "" : " overview-grid-readonly"}`}
+            >
               <section className="panel">
                 <div className="panel-title">
                   <div>
@@ -144,44 +140,38 @@ export function Overview() {
                   />
                 )}
               </section>
-              <section
-                className="panel stock-actions"
-                aria-labelledby="stock-actions-heading"
-              >
-                <div className="panel-title">
-                  <div>
-                    <h2 id="stock-actions-heading">Stock actions</h2>
-                    <p>Record receipts, issues and parts usage.</p>
+              {user.role === "admin" && (
+                <section
+                  className="panel stock-actions"
+                  aria-labelledby="stock-actions-heading"
+                >
+                  <div className="panel-title">
+                    <div>
+                      <h2 id="stock-actions-heading">Stock actions</h2>
+                      <p>Record receipts, issues and stock counts.</p>
+                    </div>
                   </div>
-                </div>
-                <div className="stock-actions-body">
-                  <div className="stock-actions-buttons">
-                    {user.role === "admin" ? (
-                      <>
-                        <Button onClick={() => setAction("receipt")}>
-                          <ArrowDownToLine size={18} />
-                          Receive stock
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => setAction("manual_out")}
-                        >
-                          <ArrowUpFromLine size={18} />
-                          Issue or adjust
-                        </Button>
-                      </>
-                    ) : (
-                      <Button onClick={() => setAction("repair_usage")}>
-                        Record repair usage
+                  <div className="stock-actions-body">
+                    <div className="stock-actions-buttons">
+                      <Button onClick={() => setAction("receipt")}>
+                        <ArrowDownToLine size={18} />
+                        Receive stock
                       </Button>
-                    )}
+                      <Button
+                        variant="secondary"
+                        onClick={() => setAction("manual_out")}
+                      >
+                        <ArrowUpFromLine size={18} />
+                        Issue or adjust
+                      </Button>
+                    </div>
+                    <div className="ledger-mark">
+                      <ShieldCheck size={17} />
+                      Permanent movement history
+                    </div>
                   </div>
-                  <div className="ledger-mark">
-                    <ShieldCheck size={17} />
-                    Permanent movement history
-                  </div>
-                </div>
-              </section>
+                </section>
+              )}
             </div>
             <section className="panel">
               <div className="panel-title">
@@ -190,7 +180,7 @@ export function Overview() {
                   <p>
                     {user.role === "admin"
                       ? "The latest changes to your inventory"
-                      : "Your recorded stock usage"}
+                      : "Your movement history"}
                   </p>
                 </div>
                 <NavLink to="/movements">

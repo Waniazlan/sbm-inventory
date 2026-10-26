@@ -163,7 +163,7 @@ class StockCosts
 
     public function backfill(): void
     {
-        foreach (Item::orderBy('id')->cursor() as $item) {
+        foreach (Item::withTrashed()->orderBy('id')->cursor() as $item) {
             $first = $item->movements()->orderBy('id')->first();
             $opening = $first ? $first->balance_before : $item->stock;
             if ($opening > 0) {

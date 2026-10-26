@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Item;
 use App\Models\ItemUnit;
+use App\Models\LabelSetting;
 use App\Models\Movement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -14,8 +15,8 @@ class UnitSerials
     {
         do {
             $number = DB::selectOne("SELECT nextval('inventory_barcode_seq') AS number")->number;
-            $barcode = sprintf('SBM-P-%08d', $number);
-        } while (Item::where('barcode', $barcode)->exists() || ItemUnit::where('serial_number', $barcode)->exists());
+            $barcode = sprintf('%s-%08d', app(LabelSetting::class)->barcode_prefix, $number);
+        } while (Item::withTrashed()->where('barcode', $barcode)->exists() || ItemUnit::where('serial_number', $barcode)->exists());
 
         return $barcode;
     }
@@ -29,8 +30,8 @@ class UnitSerials
     {
         do {
             $number = DB::selectOne("SELECT nextval('inventory_unit_serial_seq') AS number")->number;
-            $serial = sprintf('SN-%010d-%d-%d', $number, $unitCost, $supplierId ?? 0);
-        } while (ItemUnit::where('serial_number', $serial)->exists() || Item::where('barcode', $serial)->exists());
+            $serial = sprintf('%s-%010d-%d-%d', app(LabelSetting::class)->serial_prefix, $number, $unitCost, $supplierId ?? 0);
+        } while (ItemUnit::where('serial_number', $serial)->exists() || Item::withTrashed()->where('barcode', $serial)->exists());
 
         return $serial;
     }
@@ -76,7 +77,7 @@ class UnitSerials
                 foreach ($orderedSerials as $serial) {
                     DB::select('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', ['inventory:identifier:'.$serial]);
                 }
-                if (ItemUnit::whereIn('serial_number', $serials)->exists() || Item::whereIn('barcode', $serials)->exists()) {
+                if (ItemUnit::whereIn('serial_number', $serials)->exists() || Item::withTrashed()->whereIn('barcode', $serials)->exists()) {
                     throw ValidationException::withMessages(['serials' => 'A serial number is already registered. Serial numbers must be unique in this store.']);
                 }
                 $units = collect();

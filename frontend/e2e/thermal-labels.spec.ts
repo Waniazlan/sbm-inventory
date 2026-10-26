@@ -4,12 +4,18 @@ import { test, expect, type Page, type BrowserContext } from "@playwright/test";
 // only the higher quality source SVG. All inventory responses are isolated.
 test.use({ deviceScaleFactor: 203 / 96 });
 
-async function openLabels(page: Page, barcode: string, serial?: string) {
+async function openLabels(
+  page: Page,
+  barcode: string,
+  serial?: string,
+  brand: string | null = null,
+) {
   const item = {
     id: 1,
     sku: "PRN-000001",
     barcode,
     name: "Replacement LCD screen",
+    brand: "Legacy product brand",
     category_id: 1,
     category: { id: 1, name: "LCD" },
     supplier: null,
@@ -32,7 +38,7 @@ async function openLabels(page: Page, barcode: string, serial?: string) {
         : path.endsWith("/items/1/units")
           ? {
               data: serial
-                ? [{ id: 1, serial_number: serial, in_stock: true }]
+                ? [{ id: 1, serial_number: serial, in_stock: true, brand }]
                 : [],
               total: serial ? 1 : 0,
               current_page: 1,
@@ -132,14 +138,18 @@ test("XP-460B defaults to 50 × 30 mm with a large readable QR beside the text",
   await dialog.getByLabel("Number of stickers").fill("3");
   const popup = await printLabels(page, context, 3);
   await expect(popup.locator(".qr-label")).toHaveCount(3);
+  await expect(popup.locator(".label-brand")).toHaveCount(0);
   const qr = await popup.locator(".qr-label").first().boundingBox();
   // At least 22 mm on the physical sticker (previously less than 12 mm).
   expect((qr!.width * 25.4) / 96).toBeGreaterThanOrEqual(22);
   expect(qr!.height).toBeCloseTo(qr!.width, 1);
-  await popup.locator(".barcode-sticker").first().screenshot({
-    path: test.info().outputPath("50x30-label.png"),
-    scale: "device",
-  });
+  await popup
+    .locator(".barcode-sticker")
+    .first()
+    .screenshot({
+      path: test.info().outputPath("50x30-label.png"),
+      scale: "device",
+    });
   await expectPdfSize(popup, 50, 30, 3);
   expect(await decodePrintedLabel(page, popup)).toBe(barcode);
   await popup.close();
@@ -193,9 +203,49 @@ test("individual serials remain readable on 30 × 30 mm stock", async ({
   await expect(popup.locator(".label-product-code")).toHaveText(
     "Product: SBM-P-00000001",
   );
+  await expect(popup.locator(".label-brand")).toHaveCount(0);
   await expectPdfSize(popup, 30, 30, 1);
   expect(await decodePrintedLabel(page, popup)).toBe(serial);
 });
+
+for (const size of ["50x30", "30x30"]) {
+  test(`serial brand prints below the product name on ${size} stock`, async ({
+    page,
+    context,
+  }) => {
+    const serial = "SN-0000000001-12050-99";
+    const dialog = await openLabels(
+      page,
+      "SBM-P-00000001",
+      serial,
+      "Original LCD",
+    );
+    await dialog.getByLabel("Sticker size").selectOption(size);
+    await dialog.getByLabel("Label type").selectOption("units");
+    await dialog.getByLabel(`Print ${serial}`, { exact: true }).check();
+    await expect(dialog.locator("strong + .label-brand")).toHaveText(
+      "Original LCD",
+    );
+    const popup = await printLabels(page, context, 1);
+    await expect(popup.locator("strong + .label-brand")).toHaveText(
+      "Original LCD",
+    );
+    const nameBox = await popup
+      .locator(".barcode-sticker strong")
+      .boundingBox();
+    const brandBox = await popup.locator(".label-brand").boundingBox();
+    expect(brandBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height);
+    const [width, height] = size.split("x").map(Number);
+    await expectPdfSize(popup, width, height, 1);
+    expect(await decodePrintedLabel(page, popup)).toBe(serial);
+    await popup
+      .locator(".barcode-sticker")
+      .screenshot({
+        path: test.info().outputPath("serial-brand.png"),
+        scale: "device",
+      });
+  });
+}
 
 test("short identifiers keep a readable linear barcode on 30 × 30 mm stock", async ({
   page,

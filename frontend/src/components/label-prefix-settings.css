@@ -1,0 +1,13 @@
+.label-prefix-settings {
+  padding: 24px;
+}
+.label-prefix-settings h2 {
+  margin-bottom: 8px;
+  font-size: 16px;
+}
+.label-prefix-settings .form-grid {
+  padding: 16px 0;
+}
+.label-prefix-settings .row-actions {
+  margin-top: 16px;
+}

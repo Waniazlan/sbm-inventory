@@ -3,14 +3,7 @@ import React, { useRef, useState } from "react";
 import axios from "axios";
 import { Check, Package } from "lucide-react";
 import { ReceiptForm } from "./ReceiptForm";
-import {
-  api,
-  errorText,
-  type Item,
-  type Job,
-  type Movement,
-  type Page,
-} from "../api";
+import { api, errorText, type Item, type Movement, type Page } from "../api";
 
 import { Button, ErrorBox, Field, Modal } from "../components/shared";
 import { useApp, useLoad } from "../hooks";
@@ -53,14 +46,9 @@ function SingleStockForm({
   const products = useLoad<Page<Item>>(
     "/items?search=" + encodeURIComponent(search),
   );
-  const [jobSearch, setJobSearch] = useState("");
-  const jobs = useLoad<Page<Job>>(
-    "/repair-jobs?search=" + encodeURIComponent(jobSearch),
-  );
   const titles: Record<string, string> = {
     manual_out: "Issue stock",
     adjustment: "Adjust stock count",
-    repair_usage: "Record repair usage",
     reversal: "Reverse movement",
   };
   async function submit(e: React.FormEvent) {
@@ -118,7 +106,6 @@ function SingleStockForm({
               <select value={kind} onChange={(e) => setKind(e.target.value)}>
                 <option value="manual_out">Manual stock-out</option>
                 <option value="adjustment">Physical count adjustment</option>
-                <option value="repair_usage">Repair usage</option>
               </select>
             </Field>
           )}
@@ -183,43 +170,19 @@ function SingleStockForm({
               />
             </Field>
           )}
-          {kind === "repair_usage" ? (
-            <Field label="Assigned repair job">
-              <input
-                aria-label="Search repair references"
-                placeholder="Search repair reference"
-                value={jobSearch}
-                onChange={(e) => setJobSearch(e.target.value)}
-              />
-              <select
-                required
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              >
-                <option value="">Select active repair</option>
-                {jobs.data?.data
-                  .filter((j) => j.active)
-                  .map((j) => (
-                    <option key={j.id}>{j.reference}</option>
-                  ))}
-              </select>
-              <small>Only active assigned jobs can consume parts.</small>
-            </Field>
-          ) : (
-            <Field
-              label={
-                kind === "adjustment" ? "Count reference" : "Source reference"
-              }
-            >
-              <input
-                required={kind === "adjustment"}
-                placeholder="e.g. GRN-1001"
-                maxLength={120}
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-              />
-            </Field>
-          )}
+          <Field
+            label={
+              kind === "adjustment" ? "Count reference" : "Source reference"
+            }
+          >
+            <input
+              required={kind === "adjustment"}
+              placeholder="e.g. GRN-1001"
+              maxLength={120}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+            />
+          </Field>
           {kind !== "reversal" && (
             <Field label="Unit serial numbers" wide>
               <textarea

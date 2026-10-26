@@ -15,8 +15,9 @@ class StockController
 {
     public function post(Request $r, Ledger $ledger)
     {
+        abort_unless($r->user()->role === 'admin', 403, 'Administrator access required to record stock movements.');
         $multiReceipt = $r->input('kind') === 'receipt' && $r->exists('items');
-        $rules = ['request_key' => 'required|uuid', 'kind' => 'required|in:receipt,manual_out,adjustment,repair_usage,reversal', 'item_id' => 'required_unless:kind,reversal|integer|exists:items,id', 'quantity' => 'required_unless:kind,adjustment,reversal|integer|min:1|max:100000000', 'reason' => 'required|string|min:3|max:500', 'reference' => 'required_if:kind,repair_usage,adjustment|nullable|string|max:120', 'counted_quantity' => 'required_if:kind,adjustment|integer|min:0|max:100000000', 'movement_id' => 'required_if:kind,reversal|integer|exists:movements,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'unit_cost' => 'nullable|integer|min:0|max:100000000', 'batch' => 'nullable|string|max:150', 'serials' => 'nullable|string|max:130000', 'approval_note' => 'nullable|string|max:1000', 'occurred_at' => 'nullable|date|before_or_equal:now'];
+        $rules = ['request_key' => 'required|uuid', 'kind' => 'required|in:receipt,manual_out,adjustment,reversal', 'item_id' => 'required_unless:kind,reversal|integer|exists:items,id', 'quantity' => 'required_unless:kind,adjustment,reversal|integer|min:1|max:100000000', 'reason' => 'required|string|min:3|max:500', 'reference' => 'required_if:kind,adjustment|nullable|string|max:120', 'counted_quantity' => 'required_if:kind,adjustment|integer|min:0|max:100000000', 'movement_id' => 'required_if:kind,reversal|integer|exists:movements,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'unit_cost' => 'nullable|integer|min:0|max:100000000', 'batch' => 'nullable|string|max:150', 'serials' => 'nullable|string|max:130000', 'approval_note' => 'nullable|string|max:1000', 'occurred_at' => 'nullable|date|before_or_equal:now'];
         if ($r->input('kind') === 'receipt') {
             $rules['reason'] = 'nullable|string|min:3|max:500';
             $rules['brand'] = 'nullable|string|max:100';
@@ -39,7 +40,6 @@ class StockController
             $rules['items'] = 'prohibited';
         }
         $d = $r->validate($rules);
-        abort_unless($r->user()->role === 'admin' || $d['kind'] === 'repair_usage', 403, 'Technicians can only record assigned repair usage.');
         if ($d['kind'] === 'receipt') {
             abort_unless(! empty($d['supplier_id']) || ! empty($d['reference']), 422, 'A receipt requires a supplier or reference.');
             $d['reason'] ??= 'Stock received from supplier';
@@ -114,7 +114,7 @@ class StockController
 
     public function report(Request $r)
     {
-        $r->validate(['kind' => 'required|in:current,low,movements,reasons,repairs,sales,valuation', 'format' => 'nullable|in:csv']);
+        $r->validate(['kind' => 'required|in:current,low,movements,reasons,repairs,sales,valuation', 'format' => 'nullable|in:csv', 'per_page' => 'nullable|integer|min:5|max:100']);
         $kind = $r->input('kind');
         if (in_array($kind, ['current', 'low', 'valuation'])) {
             if ($kind === 'low') {
@@ -150,6 +150,6 @@ class StockController
             }, 'inventory-'.$kind.'.csv', ['Content-Type' => 'text/csv']);
         }
 
-        return $q->paginate(25)->through($map);
+        return $q->paginate($r->integer('per_page', 25) ?: 25)->through($map);
     }
 }

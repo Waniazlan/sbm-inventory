@@ -22,6 +22,7 @@ import {
   Time,
 } from "../components/shared";
 import { LoginAppearanceSettings } from "../components/login-appearance-settings";
+import { LabelPrefixSettings } from "../components/LabelPrefixSettings";
 import { useApp, useLoad } from "../hooks";
 export function SettingsPage() {
   const { meta, reload, notify } = useApp();
@@ -89,10 +90,11 @@ export function SettingsPage() {
     <>
       <Heading
         title="Workspace settings"
-        subtitle="Manage catalogue references, staff access, login appearance and audit history."
+        subtitle="Manage catalogue references, label prefixes, staff access, login appearance and audit history."
         actions={
           tab !== "audit" &&
-          tab !== "appearance" && (
+          tab !== "appearance" &&
+          tab !== "labels" && (
             <Button
               onClick={() => {
                 setEdit(null);
@@ -118,6 +120,7 @@ export function SettingsPage() {
           categories: "Categories",
           "phone-models": "Phone models",
           suppliers: "Suppliers",
+          labels: "Labels",
           users: "Staff access",
           appearance: "User interface",
           audit: "Audit trail",
@@ -136,6 +139,8 @@ export function SettingsPage() {
       >
         {tab === "appearance" ? (
           <LoginAppearanceSettings />
+        ) : tab === "labels" ? (
+          <LabelPrefixSettings />
         ) : lists[tab] ? (
           <div className="reference-grid">
             {lists[tab].map((x) => (

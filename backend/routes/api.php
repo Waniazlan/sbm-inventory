@@ -3,7 +3,10 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogueController;
 use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\LabelSettingsController;
 use App\Http\Controllers\LoginBackgroundController;
+use App\Http\Controllers\RepairUsageReversalController;
+use App\Http\Controllers\ReportOverviewController;
 use App\Http\Controllers\StockController;
 use App\Services\Ledger;
 use Illuminate\Http\Request;
@@ -24,8 +27,9 @@ Route::prefix('v1')->group(function () {
         Route::get('items/{item}/units', [CatalogueController::class, 'units'])->whereNumber('item');
         Route::get('movements', [StockController::class, 'index']);
         Route::post('movements', [StockController::class, 'post']);
-        Route::get('repair-jobs', [CatalogueController::class, 'jobs']);
         Route::middleware('admin')->group(function () {
+            Route::get('settings/labels', [LabelSettingsController::class, 'show']);
+            Route::put('settings/labels', [LabelSettingsController::class, 'update']);
             Route::post('settings/login-background', [LoginBackgroundController::class, 'store']);
             Route::delete('settings/login-background', [LoginBackgroundController::class, 'destroy']);
             Route::get('items/{item}/batches', [CatalogueController::class, 'batches'])->whereNumber('item');
@@ -33,12 +37,13 @@ Route::prefix('v1')->group(function () {
             Route::post('items/generate-barcode', [CatalogueController::class, 'generateBarcode']);
             Route::put('items/{item}/supplier-stock', [CatalogueController::class, 'editSupplierStock'])->whereNumber('item');
             Route::put('items/{item}', [CatalogueController::class, 'save'])->whereNumber('item');
+            Route::delete('items/{item}', [CatalogueController::class, 'destroy'])->whereNumber('item')->withTrashed();
             Route::post('metadata/{kind}', [CatalogueController::class, 'createMetadata']);
             Route::get('users', [CatalogueController::class, 'users']);
             Route::post('users', [CatalogueController::class, 'saveUser']);
             Route::put('users/{user}', [CatalogueController::class, 'saveUser']);
-            Route::post('repair-jobs', [CatalogueController::class, 'saveJob']);
             Route::get('reports', [StockController::class, 'report']);
+            Route::get('reports/overview', ReportOverviewController::class);
             Route::get('audit', [StockController::class, 'audit']);
             Route::get('integrations', [IntegrationController::class, 'events']);
         });
@@ -50,5 +55,6 @@ Route::prefix('v1')->group(function () {
         Route::post('stock/validate', [IntegrationController::class, 'validateStock']);
         Route::post('stock/{direction}', [IntegrationController::class, 'post'])->whereIn('direction', ['in', 'out']);
     });
+    Route::post('repair/usage/reverse', RepairUsageReversalController::class)->middleware(['integration:repair', 'throttle:120,1']);
     Route::post('repair/usage', fn (Request $r, Ledger $l) => app(IntegrationController::class)->post($r, $l, 'out'))->middleware(['integration:repair', 'throttle:120,1']);
 });

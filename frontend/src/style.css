@@ -394,6 +394,9 @@ strong {
   overflow: hidden;
   min-width: 0;
 }
+.overview-grid-readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
 .panel-title {
   padding: 20px 24px;
   display: flex;
@@ -575,6 +578,21 @@ td .inline {
   min-height: 34px;
   padding: 7px 11px;
 }
+.button.danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+.button.danger:hover:not(:disabled) {
+  background: #912018;
+  border-color: #912018;
+}
+.delete-item-body {
+  padding: 24px;
+}
+.delete-item-body p + p {
+  margin-top: 12px;
+}
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -587,6 +605,20 @@ td .inline {
   flex-wrap: wrap;
 }
 .toolbar > select {
+  max-width: 185px;
+}
+.catalogue-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.catalogue-sort > span {
+  white-space: nowrap;
+}
+.catalogue-sort select {
+  width: auto;
   max-width: 185px;
 }
 .toolbar > input {

@@ -87,7 +87,6 @@ test("catalogue, receipt, adjustment, reversal, reports and responsive navigatio
     "/",
     "/catalogue",
     "/movements",
-    "/repairs",
     "/low-stock",
     "/reports",
     "/integrations",

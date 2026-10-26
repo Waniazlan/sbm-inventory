@@ -19,15 +19,18 @@ Use persistent PostgreSQL storage for ongoing work. The original development clu
 | Item catalogue | Automatic SKU and store barcode, printable product/unit stickers, optional individual serial tracking, camera/photo capture and exact lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
 | Receive stock | Multiple item rows with dropdown selection and add/remove controls; shared supplier/reference; quantity, cost, batch and scanned serials per item |
 | Movement ledger | Receipts, issues, counts, sales, repair usage, returns and linked reversals; search, date/type/user filters |
-| Repair parts | Administrator assigns external repair references; technicians consume parts only on their active assignments |
 | Low-stock watch | Active items at or below minimum, including out-of-stock items |
-| Reports | Current stock, low stock, movements, stock-out reasons, repair usage, sales linkage, valuation; paginated display and CSV export |
+| Reports | One page with stock totals, interactive stock-in/out trends, category valuation, stock-out reason graphs, and all report tables; shared activity dates, independent pagination and full CSV exports |
 | Integrations | Accepted external operations and acknowledgements |
 | Settings | Categories, phone models, suppliers, staff roles/activation and immutable audit history |
 
 New items receive an automatic SKU such as `PRN-000001` when saved. Leave the barcode blank for an automatic store code such as `SBM-P-00000001`, or use **Generate store barcode** to preview a new one before saving. Existing supplier barcode and QR values remain supported. SKUs stay unchanged when editing; existing SKUs are preserved. Manufacturer/supplier part numbers remain optional manual entries.
 
-Start by adding phone models and suppliers in Settings. Create items with compatibility mappings, then record receipts for opening stock. To issue or count a specific item, click its name in the catalogue and choose **Issue or adjust stock**. A technician can use **Repair parts → Record usage** after an administrator assigns a repair reference.
+Administrators can change the SKU, product barcode, and unit serial prefixes under **Settings → Labels**. The defaults are `PRN`, `SBM-P`, and `SN`; previews show the resulting formats before saving. Prefixes accept up to 20 letters or numbers with internal hyphens or underscores. Changes apply only to newly generated identifiers, continue the existing number sequences, and preserve existing identifiers, manual barcode/serial values, and receipt retries. For example, changing the serial prefix to `VG` generates `VG-0000000001-12050-7` with the same cost/supplier suffix rules. Run `php artisan migrate` in `backend` to create the saved label settings on another installation.
+
+Administrators can select **Delete** on an item in the catalogue and confirm **Delete item**. Stock, remaining batch quantities, and available serials must all be zero. Deleted items disappear from catalogue searches, stock dropdowns, and integration product lists; their movement, batch-cost, serial, and audit history remains intact and searchable in reports. Existing identifiers stay reserved, and completed stock requests can still be replayed safely. Deletion is recorded in the audit trail. Run `php artisan migrate` in `backend` to add deletion support on another installation.
+
+Start by adding phone models and suppliers in Settings. Create items with compatibility mappings, then record receipts for opening stock. To issue or count a specific item, click its name in the catalogue and choose **Issue or adjust stock**. Repair assignments and parts usage are managed in SBM Tracking, which posts stock deductions and reversals through Inventory's repair integration. The former Repair parts page and manual assignment endpoints have been removed; existing assignments and stock history are retained.
 
 No business sample stock is seeded. Browser checks create explicitly named verification items and immutable history; successful runs reverse their receipts and deactivate those items.
 
@@ -65,7 +68,7 @@ Run `cd backend && php artisan migrate` before using this feature on another ins
 - Positive whole-unit quantities only; pieces, sets and packs are supported. No negative stock or reservations.
 - PostgreSQL item locks prevent concurrent over-issue. An entire external request succeeds or rolls back together.
 - Posted movements and audit entries cannot be updated/deleted, enforced by database triggers. Corrections create linked reversals or reasoned count adjustments.
-- Administrators manage catalogue, staff, receipts, manual issues, counts and reversals. Technicians see availability and their own movements, consume assigned repair parts, and cannot read item costs or valuation reports.
+- Administrators manage catalogue, staff, receipts, manual issues, counts and reversals. Technicians can view availability and their own movement history; repair parts usage is recorded in SBM Tracking. Technicians cannot post manual stock movements or read item costs or valuation reports. Repair usage remains searchable in the movement ledger and repair reports.
 - Money uses integer MYR sen. Valuation is **the sum of remaining batch quantity × original intake cost**. Supplier and purchase cost are entered in Receive stock. Product forms contain catalogue details and selling price; later receipts and catalogue edits never reprice existing batches or change selling prices. The receiving form requires an explicit unit cost; zero is a valid cost.
 - UTC storage; display and report date boundaries use `SHOP_TIMEZONE` (Asia/Kuala_Lumpur by default).
 - One inventory location per installation. Portal branch selection is not an inventory permission or tenant boundary.

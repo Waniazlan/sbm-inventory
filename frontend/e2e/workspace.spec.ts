@@ -29,7 +29,6 @@ test("live Inventory pages and dialogs fit the Sales-style workspace", async ({
   for (const [link, title] of [
     ["Item catalogue", "Item catalogue"],
     ["Movement ledger", "Movement ledger"],
-    ["Repair parts", "Repair parts"],
     ["Low-stock watch", "Low-stock watch"],
     ["Reports", "Inventory reports"],
     ["Integrations", "Integration history"],
@@ -133,6 +132,18 @@ test("live Inventory pages and dialogs fit the Sales-style workspace", async ({
   await page.getByRole("link", { name: "SBM Inventory home" }).press("Escape");
   await expect(menu).toBeFocused();
   await expect(menu).toHaveAttribute("aria-expanded", "false");
+  await expect(
+    navigation.getByRole("link", { name: "Repair parts", exact: true }),
+  ).toHaveCount(0);
+  await page.goto("/repairs");
+  await expect(
+    page.getByRole("heading", { name: "Stock overview", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: /Record repair usage|Record usage|Assign repair/,
+    }),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
@@ -169,8 +180,8 @@ test("technicians keep their navigation and drawer state resets on desktop", asy
   const menu = page.getByRole("button", { name: "Open menu" });
   await menu.click();
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(navigation.getByRole("link")).toHaveCount(5);
-  for (const name of ["Settings", "Reports", "Integrations"])
+  await expect(navigation.getByRole("link")).toHaveCount(4);
+  for (const name of ["Settings", "Reports", "Integrations", "Repair parts"])
     await expect(
       navigation.getByRole("link", { name, exact: true }),
     ).toHaveCount(0);
@@ -180,4 +191,16 @@ test("technicians keep their navigation and drawer state resets on desktop", asy
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(menu).toHaveAttribute("aria-expanded", "false");
   await expect(navigation).not.toBeVisible();
+  await page.goto("/movements");
+  await expect(
+    page.getByRole("heading", { name: "Movement ledger", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Record movement", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .getByLabel("Movement type")
+      .getByRole("option", { name: "Repair usage", exact: true }),
+  ).toHaveCount(1);
 });

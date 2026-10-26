@@ -71,6 +71,23 @@ class UnitSerialTest extends TestCase
         $this->getJson('/api/v1/items?barcode=SN-0000000001-12050-'.$supplier->id)->assertOk()->assertJsonPath('data.0.id', $this->item->id);
     }
 
+    public function test_serial_labels_use_each_batch_brand_including_corrections_and_blank_brands(): void
+    {
+        $this->item->update(['brand' => 'Legacy product brand']);
+        foreach (['Original', 'Compatible', null] as $index => $brand) {
+            $this->move(['quantity' => 1, 'brand' => $brand, 'serials' => 'LABEL-'.$index])->assertOk();
+        }
+        $labels = fn () => collect($this->getJson('/api/v1/items/'.$this->item->id.'/units')->assertOk()->json('data'))->keyBy('serial_number');
+        $this->assertSame('Original', $labels()['LABEL-0']['brand']);
+        $this->assertSame('Compatible', $labels()['LABEL-1']['brand']);
+        $this->assertNull($labels()['LABEL-2']['brand']);
+        $batch = StockBatch::findOrFail(ItemUnit::where('serial_number', 'LABEL-0')->value('stock_batch_id'));
+        $batch->update(['brand_corrected' => true, 'brand_override' => 'Corrected brand']);
+        $this->assertSame('Corrected brand', $labels()['LABEL-0']['brand']);
+        $batch->update(['brand_override' => null]);
+        $this->assertNull($labels()['LABEL-0']['brand']);
+    }
+
     public function test_generated_serials_support_zero_cost_missing_supplier_and_skip_identifier_collisions(): void
     {
         DB::select("SELECT setval('inventory_unit_serial_seq', 1, false)");

@@ -9,6 +9,7 @@ use App\Models\Operation;
 use App\Models\PhoneModel;
 use App\Models\RepairJob;
 use App\Models\User;
+use App\Services\Ledger;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -102,18 +103,31 @@ class InventoryTest extends TestCase
         DB::transaction(fn () => DB::table('movements')->where('id', $id)->update(['reason' => 'Changed']));
     }
 
-    public function test_technician_assignment_permissions_and_cost_redaction()
+    public function test_technicians_can_read_their_history_but_cannot_post_stock_movements()
     {
         $this->movement();
         $tech = User::create(['name' => 'Tech', 'email' => 'tech@example.test', 'password' => 'test-password-123', 'role' => 'technician']);
         RepairJob::create(['reference' => 'REP-1', 'technician_id' => $tech->id]);
+        app(Ledger::class)->post(['request_key' => 'historical-usage', 'kind' => 'repair_usage', 'reference' => 'USAGE-1', 'repair_job_reference' => 'REP-1', 'actor_reference' => 'tech-remote', 'reason' => 'Installed battery', 'items' => [['item_id' => $this->item->id, 'quantity' => 1, 'line_id' => '1']]], 'repair', $tech->id);
         $this->actingAs($tech);
         $this->movement()->assertForbidden();
         $this->movement(['kind' => 'repair_usage', 'reference' => 'OTHER'])->assertForbidden();
-        $this->movement(['kind' => 'repair_usage', 'reference' => 'REP-1', 'quantity' => 1])->assertOk();
+        $this->movement(['kind' => 'repair_usage', 'reference' => 'REP-1', 'quantity' => 1])->assertForbidden();
         $this->getJson('/api/v1/items')->assertOk()->assertJsonMissingPath('data.0.cost');
         $this->getJson('/api/v1/movements')->assertJsonCount(1, 'data')->assertJsonMissingPath('data.0.unit_cost');
         $this->getJson('/api/v1/reports?kind=valuation')->assertForbidden();
+    }
+
+    public function test_manual_repair_assignment_endpoints_and_manual_usage_are_removed_without_deleting_history()
+    {
+        $this->movement()->assertOk();
+        $assignment = RepairJob::create(['reference' => 'LEGACY-REP', 'technician_id' => $this->admin->id]);
+        $this->getJson('/api/v1/repair-jobs')->assertNotFound();
+        $this->postJson('/api/v1/repair-jobs', ['reference' => 'NEW-REP', 'technician_id' => $this->admin->id, 'active' => true])->assertNotFound();
+        $this->movement(['kind' => 'repair_usage', 'reference' => 'LEGACY-REP'])->assertUnprocessable()->assertJsonValidationErrors('kind');
+        $this->assertDatabaseHas('repair_jobs', ['id' => $assignment->id, 'reference' => 'LEGACY-REP']);
+        $this->assertSame(10, $this->item->fresh()->stock);
+        $this->assertSame(1, Movement::count());
     }
 
     public function test_paid_sale_retry_and_reference_deduplication()

@@ -6,6 +6,7 @@ import { money, type Item, type Page } from "../api";
 import { ItemLabels } from "../components/ItemLabels";
 import { ItemForm } from "../components/ItemForm";
 import { ItemDetails } from "../components/ItemDetails";
+import { DeleteItem } from "../components/DeleteItem";
 import { BarcodeScanner } from "../components/BarcodeScanner";
 import {
   Button,
@@ -20,9 +21,11 @@ import { useApp, useLoad } from "../hooks";
 export function Catalogue({ low = false }: { low?: boolean }) {
   const { user, meta } = useApp();
   const [labels, setLabels] = useState<Item | null>(null);
+  const [deleting, setDeleting] = useState<Item | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState("");
   const [search, setSearch] = useState(""),
+    [sort, setSort] = useState("newest"),
     [status, setStatus] = useState(low ? "low" : ""),
     [category, setCategory] = useState(""),
     [page, setPage] = useState(1),
@@ -31,8 +34,8 @@ export function Catalogue({ low = false }: { low?: boolean }) {
     [detail, setDetail] = useState<Item | null>(null);
   const q = useLoad<Page<Item>>(
     scannedBarcode
-      ? `/items?barcode=${encodeURIComponent(scannedBarcode)}&page=${page}`
-      : `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&page=${page}`,
+      ? `/items?barcode=${encodeURIComponent(scannedBarcode)}&sort=${sort}&page=${page}`
+      : `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&sort=${sort}&page=${page}`,
   );
   return (
     <>
@@ -72,6 +75,24 @@ export function Catalogue({ low = false }: { low?: boolean }) {
               }}
             />
           </div>
+          <label className="catalogue-sort">
+            <span>Sort by</span>
+            <select
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="newest">Newest first</option>
+              <option value="modified">Latest modified</option>
+              <option value="oldest">Oldest first</option>
+              <option value="name_asc">Name: A–Z</option>
+              <option value="name_desc">Name: Z–A</option>
+              <option value="stock_desc">Stock: high to low</option>
+              <option value="stock_asc">Stock: low to high</option>
+            </select>
+          </label>
           <select
             aria-label="Category"
             value={category}
@@ -179,7 +200,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                           >
                             Labels &amp; serials
                           </Button>
-                          {user.role === "admin" ? (
+                          {user.role === "admin" && (
                             <>
                               <Button
                                 variant="secondary"
@@ -195,16 +216,13 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                               >
                                 Receive
                               </Button>
+                              <Button
+                                variant="danger"
+                                onClick={() => setDeleting(i)}
+                              >
+                                Delete
+                              </Button>
                             </>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              onClick={() =>
-                                setStock({ kind: "repair_usage", item: i })
-                              }
-                            >
-                              Use part
-                            </Button>
                           )}
                         </div>
                       </td>
@@ -234,6 +252,17 @@ export function Catalogue({ low = false }: { low?: boolean }) {
           <Pager page={q.data} setPage={setPage} />
         </Status>
       </section>
+      {deleting && (
+        <DeleteItem
+          item={deleting}
+          close={() => setDeleting(null)}
+          done={() => {
+            setDeleting(null);
+            if (q.data?.data.length === 1 && page > 1) setPage(page - 1);
+            else q.reload();
+          }}
+        />
+      )}
       {labels && <ItemLabels item={labels} close={() => setLabels(null)} />}
       {scanning && (
         <BarcodeScanner

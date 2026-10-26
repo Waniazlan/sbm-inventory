@@ -6,7 +6,7 @@ use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemUnit;
 use App\Models\PhoneModel;
-use App\Models\RepairJob;
+use App\Models\StockBatch;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Audit;
@@ -76,7 +76,18 @@ class CatalogueController
 
     public function index(Request $r)
     {
-        $p = self::query($r)->orderBy('name')->paginate(25);
+        $sorts = [
+            'newest' => ['items.created_at', 'desc'],
+            'modified' => ['items.updated_at', 'desc'],
+            'oldest' => ['items.created_at', 'asc'],
+            'name_asc' => ['items.name', 'asc'],
+            'name_desc' => ['items.name', 'desc'],
+            'stock_desc' => ['items.stock', 'desc'],
+            'stock_asc' => ['items.stock', 'asc'],
+        ];
+        $r->validate(['sort' => ['nullable', Rule::in(array_keys($sorts))]]);
+        [$column, $direction] = $sorts[$r->query('sort') ?: 'newest'];
+        $p = self::query($r)->orderBy($column, $direction)->orderBy('items.id', $r->query('sort') === 'oldest' ? 'asc' : 'desc')->paginate(25);
         $p->through(fn ($i) => self::present($i, $r->user()->role === 'admin'));
 
         return $p;
@@ -88,6 +99,26 @@ class CatalogueController
         $detail['supplier_stock'] = app(SupplierStock::class)->summary($item, $r->user()->role === 'admin');
 
         return $detail;
+    }
+
+    public function destroy(Item $item)
+    {
+        DB::transaction(function () use ($item) {
+            // Use the same item lock as stock posting so intake cannot race deletion.
+            $item = Item::withTrashed()->whereKey($item->id)->lockForUpdate()->firstOrFail();
+            if ($item->trashed()) {
+                return;
+            }
+            abort_if($item->stock !== 0 || $item->batches()->where('remaining_quantity', '>', 0)->exists()
+                || ItemUnit::where('item_id', $item->id)->where('in_stock', true)->exists(),
+                422, 'This item still has stock. Issue, return or adjust the remaining stock before deleting it.');
+            $before = $item->toArray();
+            $item->update(['active' => false]);
+            $item->delete();
+            Audit::record('item.deleted', (string) $item->id, ['before' => $before]);
+        });
+
+        return response()->noContent();
     }
 
     public function editSupplierStock(Request $r, Item $item, SupplierStock $stock)
@@ -126,10 +157,13 @@ class CatalogueController
     {
         $r->validate(['state' => 'nullable|in:available,issued', 'search' => 'nullable|string|max:120']);
 
-        return ItemUnit::where('item_id', $item->id)
+        return ItemUnit::query()
+            ->leftJoinSub(StockBatch::withBrand(), 'label_batch', fn ($join) => $join->on('label_batch.id', '=', 'item_units.stock_batch_id'))
+            ->select('item_units.*', 'label_batch.effective_brand as brand')
+            ->where('item_units.item_id', $item->id)
             ->when($r->filled('state'), fn ($q) => $q->where('in_stock', $r->input('state') === 'available'))
             ->when($r->filled('search'), fn ($q) => $q->where('serial_number', 'ilike', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $r->input('search')).'%'))
-            ->orderByDesc('id')->paginate(50);
+            ->orderByDesc('item_units.id')->paginate(50);
     }
 
     public function save(Request $r, ?Item $item = null)
@@ -256,23 +290,6 @@ class CatalogueController
             }Audit::record('user.saved', (string) $user->id, array_diff_key($d, ['password' => true]));
 
             return $user;
-        });
-    }
-
-    public function jobs(Request $r)
-    {
-        return RepairJob::with('technician:id,name')->when($r->user()->role !== 'admin', fn ($q) => $q->where('technician_id', $r->user()->id))->when($r->filled('search'), fn ($q) => $q->where('reference', 'ilike', '%'.$r->input('search').'%'))->orderByDesc('id')->paginate(25);
-    }
-
-    public function saveJob(Request $r)
-    {
-        $d = $r->validate(['reference' => 'required|string|max:120', 'technician_id' => ['required', Rule::exists('users', 'id')->where('active', true)->where('role', 'technician')], 'active' => 'required|boolean']);
-
-        return DB::transaction(function () use ($d) {
-            $j = RepairJob::updateOrCreate(['reference' => $d['reference']], $d);
-            Audit::record('repair.assignment', (string) $j->id, $d);
-
-            return $j;
         });
     }
 }

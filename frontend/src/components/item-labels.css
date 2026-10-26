@@ -90,3 +90,30 @@
   white-space: normal;
   max-height: 2.4em;
 }
+.barcode-sticker .label-brand,
+.barcode-sticker .label-sku {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.barcode-sticker .label-brand {
+  font-size: 6pt;
+}
+.barcode-sticker-qr.barcode-sticker-branded > strong {
+  font-size: 8pt;
+}
+.barcode-sticker-qr.barcode-sticker-branded > .label-symbol {
+  grid-row: 1 / span 5;
+}
+.barcode-sticker-branded:not(.barcode-sticker-qr) {
+  gap: 0.25mm;
+}
+.barcode-sticker-branded:not(.barcode-sticker-qr) > strong {
+  font-size: 8pt;
+  line-height: 1.1;
+}
+.barcode-sticker-branded:not(.barcode-sticker-qr) > span {
+  font-size: 6pt;
+  line-height: 1.1;
+}

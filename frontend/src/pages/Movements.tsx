@@ -32,14 +32,12 @@ export function Movements() {
         title="Movement ledger"
         subtitle="A permanent record of what changed, who recorded it and why."
         actions={
-          <Button
-            onClick={() =>
-              setAction(user.role === "admin" ? "manual_out" : "repair_usage")
-            }
-          >
-            <Plus size={17} />
-            Record movement
-          </Button>
+          user.role === "admin" && (
+            <Button onClick={() => setAction("manual_out")}>
+              <Plus size={17} />
+              Record movement
+            </Button>
+          )
         }
       />
       <section className="panel">

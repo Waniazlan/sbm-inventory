@@ -57,6 +57,7 @@ export type ItemUnit = {
   item_id: number;
   serial_number: string;
   in_stock: boolean;
+  brand: string | null;
 };
 export type SupplierStockEntry = {
   brand: string | null;
@@ -92,13 +93,6 @@ export type Movement = {
   unit_cost?: number | null;
   total_cost?: number;
   supplier?: Named | null;
-};
-export type Job = {
-  id: number;
-  reference: string;
-  technician_id: number;
-  technician: Named;
-  active: boolean;
 };
 export type Page<T> = {
   data: T[];
