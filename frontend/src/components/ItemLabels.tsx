@@ -92,7 +92,7 @@ function StickerPreview({
 }
 
 export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
-  const [mode, setMode] = useState("product");
+  const [mode, setMode] = useState(item.serial_tracking ? "units" : "product");
   const [copies, setCopies] = useState(1);
   const [size, setSize] = useState("50x30");
   const [customWidth, setCustomWidth] = useState("50");
@@ -194,10 +194,10 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
         <div className="form-grid">
           <Field label="Label type">
             <select value={mode} onChange={(e) => setMode(e.target.value)}>
-              <option value="product">Product barcode</option>
               {item.serial_tracking && (
                 <option value="units">Individual unit serials</option>
               )}
+              <option value="product">Product barcode</option>
             </select>
           </Field>
           <Field label="Sticker size (one label)">

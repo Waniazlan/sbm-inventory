@@ -56,6 +56,8 @@ test("store barcode, individual serials, printable stickers and exact serial loo
   await expect(dialog).not.toBeVisible();
   try {
     await row.getByRole("button", { name: "Labels & serials" }).click();
+    await expect(dialog.getByLabel("Label type")).toHaveValue("units");
+    await dialog.getByLabel("Label type").selectOption("product");
     await expect(dialog.locator(".barcode-sticker img")).toHaveCount(1);
     await dialog.getByLabel("Sticker size").selectOption("50x30");
     // Decode the actual rendered label image using the application's scanner.

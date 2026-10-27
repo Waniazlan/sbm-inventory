@@ -63,7 +63,11 @@ async function openLabels(
       return popup;
     };
   });
-  return page.getByRole("dialog");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Label type")).toHaveValue(
+    serial ? "units" : "product",
+  );
+  return dialog;
 }
 
 async function printLabels(page: Page, context: BrowserContext, count: number) {
