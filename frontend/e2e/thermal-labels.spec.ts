@@ -128,7 +128,7 @@ async function expectPdfSize(
   }
 }
 
-test("XP-460B defaults to 50 × 30 mm with a large readable QR beside the text", async ({
+test("XP-460B defaults to 50 × 30 mm with a compact readable QR beside the text", async ({
   page,
   context,
 }) => {
@@ -140,8 +140,9 @@ test("XP-460B defaults to 50 × 30 mm with a large readable QR beside the text",
   await expect(popup.locator(".qr-label")).toHaveCount(3);
   await expect(popup.locator(".label-brand")).toHaveCount(0);
   const qr = await popup.locator(".qr-label").first().boundingBox();
-  // At least 22 mm on the physical sticker (previously less than 12 mm).
-  expect((qr!.width * 25.4) / 96).toBeGreaterThanOrEqual(22);
+  // Keep the QR scannable while leaving more width for the serial text.
+  expect((qr!.width * 25.4) / 96).toBeGreaterThanOrEqual(20);
+  expect((qr!.width * 25.4) / 96).toBeLessThanOrEqual(22);
   expect(qr!.height).toBeCloseTo(qr!.width, 1);
   await popup
     .locator(".barcode-sticker")
@@ -227,6 +228,22 @@ for (const size of ["50x30", "30x30"]) {
       "Original LCD",
     );
     const popup = await printLabels(page, context, 1);
+    if (size === "50x30") {
+      for (const document of [dialog, popup]) {
+        const value = document.locator(".label-value");
+        await expect(value).toHaveText(`S/N: ${serial}`);
+        const bounds = await value.evaluate((element) => ({
+          scrollHeight: element.scrollHeight,
+          clientHeight: element.clientHeight,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+        }));
+        expect(bounds.scrollHeight, JSON.stringify(bounds)).toBeLessThanOrEqual(
+          bounds.clientHeight,
+        );
+        expect(bounds.scrollWidth).toBeLessThanOrEqual(bounds.clientWidth);
+      }
+    }
     await expect(popup.locator("strong + .label-brand")).toHaveText(
       "Original LCD",
     );

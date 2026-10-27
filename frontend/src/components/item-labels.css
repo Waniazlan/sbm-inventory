@@ -49,6 +49,7 @@
 .barcode-sticker .label-value {
   font-family: monospace;
   overflow-wrap: anywhere;
+  word-break: break-all;
   font-size: 6.5pt;
   max-width: 100%;
   max-height: 2.4em;

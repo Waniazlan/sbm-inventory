@@ -23,9 +23,9 @@ function StickerPreview({
   const [error, setError] = useState("");
   const brand = sticker.serial ? sticker.brand?.trim() : undefined;
   const symbolHeight = Math.min(32, height - (sticker.serial ? 21 : 18));
-  // Landscape stock has room for text beside QR, freeing the full height
-  // for the code. Keep at least 18 mm for its human-readable details.
-  const qrSize = Math.min(32, height - 4, width - 23);
+  // Leave more room beside landscape QR codes for the complete serial.
+  // On 50 × 30 mm stock, reserve 22 mm for QR and 23 mm for text.
+  const qrSize = Math.min(28, height - 8, width - 27);
   const sideBySide = width >= height * 1.5 && qrSize > symbolHeight;
   const qrLayout = sideBySide && symbol?.format === "QRCode";
   useEffect(() => {
