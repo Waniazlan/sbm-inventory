@@ -550,6 +550,36 @@ td .inline {
   min-height: 34px;
   padding: 7px 11px;
 }
+.row-actions .catalogue-action {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.catalogue-action::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  padding: 6px 9px;
+  border-radius: 5px;
+  background: #243b2e;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px #0002;
+  pointer-events: none;
+  visibility: hidden;
+}
+.catalogue-action:hover::after,
+.catalogue-action:focus-visible::after {
+  visibility: visible;
+}
 .button.danger {
   background: #b42318;
   border-color: #b42318;

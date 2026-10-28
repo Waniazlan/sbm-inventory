@@ -1,6 +1,14 @@
 import { useState } from "react";
 
-import { Camera, Plus, Search } from "lucide-react";
+import {
+  Barcode,
+  Camera,
+  PackagePlus,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { money, type Item, type Page } from "../api";
 
 import { ItemLabels } from "../components/ItemLabels";
@@ -196,31 +204,39 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                         <div className="row-actions">
                           <Button
                             variant="secondary"
+                            className="catalogue-action"
+                            aria-label="Labels & serials"
                             onClick={() => setLabels(i)}
                           >
-                            Labels &amp; serials
+                            <Barcode size={17} aria-hidden="true" />
                           </Button>
                           {user.role === "admin" && (
                             <>
                               <Button
                                 variant="secondary"
+                                className="catalogue-action"
+                                aria-label="Edit"
                                 onClick={() => setEdit(i)}
                               >
-                                Edit
+                                <Pencil size={17} aria-hidden="true" />
                               </Button>
                               <Button
                                 variant="secondary"
+                                className="catalogue-action"
+                                aria-label="Receive"
                                 onClick={() =>
                                   setStock({ kind: "receipt", item: i })
                                 }
                               >
-                                Receive
+                                <PackagePlus size={17} aria-hidden="true" />
                               </Button>
                               <Button
                                 variant="danger"
+                                className="catalogue-action"
+                                aria-label="Delete"
                                 onClick={() => setDeleting(i)}
                               >
-                                Delete
+                                <Trash2 size={17} aria-hidden="true" />
                               </Button>
                             </>
                           )}

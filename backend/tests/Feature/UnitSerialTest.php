@@ -36,6 +36,22 @@ class UnitSerialTest extends TestCase
         return $this->postJson('/api/v1/movements', array_replace(['request_key' => (string) Str::uuid(), 'kind' => 'receipt', 'item_id' => $this->item->id, 'quantity' => 2, 'reason' => 'Unit test receipt', 'reference' => 'DELIVERY-1'], $extra));
     }
 
+    public function test_sales_stock_validation_checks_scanned_unit_availability_without_moving_stock(): void
+    {
+        $this->move(['serials' => "SCAN-1\nSCAN-2"])->assertOk();
+        $this->move(['kind' => 'manual_out', 'quantity' => 1, 'serials' => 'SCAN-1'])->assertOk();
+        config(['sbm.sales_token' => str_repeat('s', 32)]);
+        $headers = ['Authorization' => 'Bearer '.str_repeat('s', 32)];
+        $line = ['inventory_item_id' => $this->item->id, 'quantity' => 1];
+        $this->postJson('/api/v1/stock/validate', ['items' => [[...$line, 'serials' => 'SCAN-2']]], $headers)->assertOk();
+        foreach (['SCAN-1', 'UNKNOWN', $this->item->barcode, "SCAN-2\nSCAN-2"] as $serial) {
+            $this->postJson('/api/v1/stock/validate', ['items' => [[...$line, 'serials' => $serial]]], $headers)->assertUnprocessable();
+        }
+        $this->postJson('/api/v1/stock/validate', ['items' => [[...$line, 'serials' => 'SCAN-2'], [...$line, 'serials' => 'SCAN-2']]], $headers)->assertUnprocessable();
+        $this->assertSame(1, $this->item->fresh()->stock);
+        $this->assertSame(2, Movement::count());
+    }
+
     public function test_product_barcode_and_unit_serials_are_separate_generated_unique_and_searchable(): void
     {
         $this->assertMatchesRegularExpression('/^SBM-P-\d{8,}$/', $this->item->barcode);

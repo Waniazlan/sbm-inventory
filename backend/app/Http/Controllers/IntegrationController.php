@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
+use App\Models\ItemUnit;
 use App\Models\Operation;
 use App\Services\Ledger;
+use App\Services\UnitSerials;
 use Illuminate\Http\Request;
 
 class IntegrationController
@@ -31,10 +33,19 @@ class IntegrationController
 
     public function validateStock(Request $r)
     {
-        $d = $r->validate(['items' => 'required|array|min:1|max:100', 'items.*.inventory_item_id' => 'required|integer|exists:items,id', 'items.*.quantity' => 'required|integer|min:1|max:100000000']);
+        $d = $r->validate(['items' => 'required|array|min:1|max:100', 'items.*.inventory_item_id' => 'required|integer|exists:items,id', 'items.*.quantity' => 'required|integer|min:1|max:100000000', 'items.*.serials' => 'nullable|string|max:130000']);
         $totals = [];
+        $seenSerials = [];
         foreach ($d['items'] as $i) {
             $totals[$i['inventory_item_id']] = ($totals[$i['inventory_item_id']] ?? 0) + $i['quantity'];
+            if (! empty($i['serials'])) {
+                $serials = UnitSerials::parse($i['serials']);
+                $product = Item::findOrFail($i['inventory_item_id']);
+                abort_unless($product->serial_tracking && count($serials) === $i['quantity'] && ! array_intersect($seenSerials, $serials)
+                    && ItemUnit::where('item_id', $product->id)->where('in_stock', true)->whereIn('serial_number', $serials)->count() === $i['quantity'],
+                    422, 'A scanned unit serial is unavailable, duplicated or belongs to another item.');
+                $seenSerials = [...$seenSerials, ...$serials];
+            }
         }foreach ($totals as $id => $qty) {
             $i = Item::findOrFail($id);
             abort_unless($i->active && $i->stock >= $qty, 422, 'Insufficient or inactive stock: '.$i->sku);
