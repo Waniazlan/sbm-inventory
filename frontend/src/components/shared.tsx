@@ -130,7 +130,14 @@ export function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    ref.current?.showModal();
+    const dialog = ref.current;
+    const previous = document.activeElement;
+    dialog?.showModal();
+    return () => {
+      dialog?.close();
+      if (previous instanceof HTMLElement && previous.isConnected)
+        previous.focus();
+    };
   }, []);
   return (
     <dialog
@@ -273,11 +280,13 @@ export function MovementTable({
               </td>
               {onReverse && (
                 <td>
-                  {!m.reversal && !m.reverses_id && (
-                    <Button variant="quiet" onClick={() => onReverse(m)}>
-                      Reverse
-                    </Button>
-                  )}
+                  {!m.reversal &&
+                    !m.reverses_id &&
+                    m.type !== "supplier_return" && (
+                      <Button variant="quiet" onClick={() => onReverse(m)}>
+                        Reverse
+                      </Button>
+                    )}
                 </td>
               )}
             </tr>

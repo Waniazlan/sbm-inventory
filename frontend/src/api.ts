@@ -49,6 +49,8 @@ export type Item = {
   price: number | null;
   minimum_stock: number;
   stock: number;
+  available_stock?: number;
+  frozen_stock?: number;
   active: boolean;
   notes: string | null;
 };
@@ -70,6 +72,8 @@ export type ItemDetail = Item & {
     supplier_id: number | null;
     supplier_name: string | null;
     quantity: number;
+    available_quantity?: number;
+    frozen_quantity?: number;
     brands: SupplierStockEntry[];
   }[];
 };
@@ -99,6 +103,20 @@ export type Page<T> = {
   current_page: number;
   last_page: number;
   total: number;
+};
+export type SupplierReturnStatus = "process" | "delivered" | "rejected";
+export type SupplierReturn = {
+  id: number;
+  item: Pick<Item, "id" | "sku" | "name" | "unit">;
+  supplier: Named;
+  quantity: number;
+  status: SupplierReturnStatus;
+  reference: string | null;
+  reason: string;
+  serials: string | null;
+  creator: Named;
+  created_at: string;
+  updated_at: string;
 };
 export type Metadata = {
   categories: Named[];

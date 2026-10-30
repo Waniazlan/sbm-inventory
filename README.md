@@ -18,9 +18,10 @@ Use persistent PostgreSQL storage for ongoing work. The original development clu
 | Overview | Live stock counts, batch-cost value, low-stock attention list, recent movements |
 | Item catalogue | Automatic SKU and store barcode, printable product/unit stickers, optional individual serial tracking, camera/photo capture and exact lookup, category, supplier, brand, variants, compatible phone models, cost, optional selling price, minimum level, active status |
 | Receive stock | Multiple item rows with dropdown selection and add/remove controls; shared supplier/reference; quantity, cost, batch and scanned serials per item |
+| Supplier returns | Administrator table with search, supplier/status filters and pagination; popup to add an item return or update Process, Delivered and Rejected status |
 | Movement ledger | Receipts, issues, counts, sales, repair usage, returns and linked reversals; search, date/type/user filters |
 | Low-stock watch | Active items at or below minimum, including out-of-stock items |
-| Reports | One page with stock totals, interactive stock-in/out trends, category valuation, stock-out reason graphs, and all report tables; shared activity dates, independent pagination and full CSV exports |
+| Reports | Stock totals, supplier-return status quantities and rejected loss value, stock-in/out trends, category valuation, stock-out reasons and report tables; shared activity dates, independent pagination and full CSV exports |
 | Integrations | Accepted external operations and acknowledgements |
 | Settings | Categories, phone models, suppliers, staff roles/activation and immutable audit history |
 
@@ -33,6 +34,10 @@ Administrators can select **Delete** on an item in the catalogue and confirm **D
 Start by adding phone models and suppliers in Settings. Create items with compatibility mappings, then record receipts for opening stock. To issue or count a specific item, click its name in the catalogue and choose **Issue or adjust stock**. Repair assignments and parts usage are managed in SBM Tracking, which posts stock deductions and reversals through Inventory's repair integration. The former Repair parts page and manual assignment endpoints have been removed; existing assignments and stock history are retained.
 
 No business sample stock is seeded. Browser checks create explicitly named verification items and immutable history; successful runs reverse their receipts and deactivate those items.
+
+Open **Supplier returns → Add supplier return** and scan the item barcode or individual unit serial using a barcode reader, camera, photo or typed code. A unit serial automatically selects its item and receipt supplier; scan more serials from the same item and supplier to increase the quantity. Duplicate, issued, unknown and mismatched serials are rejected. Tracked items require individual serial labels. Untracked items use their product barcode and allow manual supplier and quantity selection. Complete the reason and status in the popup. **Process** keeps the quantity in on-hand stock and freezes its exact batches and serials from use. Frozen quantities are excluded from available stock, Sales/Tracking validation and normal stock consumption. **Delivered** and **Rejected** both deduct the frozen stock once, retaining its original supplier costs. Creating either final status deducts immediately. Changing between Delivered and Rejected does not deduct twice; reopening either as Process restores and freezes the quantity. Catalogue details show on-hand, frozen and available balances. Item, supplier and quantity remain fixed after creation; use **Update status** in the table for subsequent changes. Returns remain in the audit trail and movement ledger, with request protection against duplicate submissions. Run `php artisan migrate` in `backend` when updating another installation.
+
+**Reports** shows a status pie chart with quantities and percentages, plus current quantities and record counts for **Processing**, **Delivered** and **Rejected** supplier returns. Rejected quantities are classified as **Loss**, valued using the actual purchase-cost allocations of each return's current stock deduction. Reopening a return removes it from rejected loss totals; changes between final statuses never count an old deduction twice. The supplier-return summary, table and CSV are current snapshots, independent of the activity date range, like current stock and valuation. Reporting a loss does not deduct stock again.
 
 ## Barcode flow
 

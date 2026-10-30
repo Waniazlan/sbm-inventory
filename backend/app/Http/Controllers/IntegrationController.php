@@ -6,6 +6,7 @@ use App\Models\Item;
 use App\Models\ItemUnit;
 use App\Models\Operation;
 use App\Services\Ledger;
+use App\Services\StockAvailability;
 use App\Services\UnitSerials;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,7 @@ class IntegrationController
 {
     private function product(Item $i)
     {
-        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'stock' => $i->stock, 'barcode' => $i->barcode, 'serial_tracking' => $i->serial_tracking, 'compatibility' => $i->phoneModels];
+        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'stock' => StockAvailability::available($i), 'on_hand_stock' => $i->stock, 'frozen_stock' => StockAvailability::reserved($i), 'barcode' => $i->barcode, 'serial_tracking' => $i->serial_tracking, 'compatibility' => $i->phoneModels];
     }
 
     public function products(Request $r)
@@ -42,13 +43,13 @@ class IntegrationController
                 $serials = UnitSerials::parse($i['serials']);
                 $product = Item::findOrFail($i['inventory_item_id']);
                 abort_unless($product->serial_tracking && count($serials) === $i['quantity'] && ! array_intersect($seenSerials, $serials)
-                    && ItemUnit::where('item_id', $product->id)->where('in_stock', true)->whereIn('serial_number', $serials)->count() === $i['quantity'],
+                    && ItemUnit::available()->where('item_id', $product->id)->whereIn('serial_number', $serials)->count() === $i['quantity'],
                     422, 'A scanned unit serial is unavailable, duplicated or belongs to another item.');
                 $seenSerials = [...$seenSerials, ...$serials];
             }
         }foreach ($totals as $id => $qty) {
             $i = Item::findOrFail($id);
-            abort_unless($i->active && $i->stock >= $qty, 422, 'Insufficient or inactive stock: '.$i->sku);
+            abort_unless($i->active && StockAvailability::available($i) >= $qty, 422, 'Insufficient, frozen or inactive stock: '.$i->sku);
         }
 
         return ['valid' => true];

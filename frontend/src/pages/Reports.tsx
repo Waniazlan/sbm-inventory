@@ -1,5 +1,14 @@
 import { useState, type ReactNode } from "react";
-import { Download, Layers, Package, TriangleAlert, Wallet } from "lucide-react";
+import {
+  CircleX,
+  Download,
+  Layers,
+  Package,
+  PackageCheck,
+  Snowflake,
+  TriangleAlert,
+  Wallet,
+} from "lucide-react";
 import { api, errorText, label, money, type Page } from "../api";
 import {
   Button,
@@ -14,6 +23,7 @@ import {
   CategoryValue,
   MovementTrend,
   OutReasonChart,
+  SupplierReturnPie,
   type ReportOverview,
 } from "../components/ReportCharts";
 import { useApp, useLoad } from "../hooks";
@@ -31,6 +41,22 @@ const reports = {
     title: "Low stock",
     description: "Active items at or below their minimum level",
     columns: ["SKU", "Name", "Stock", "Minimum", "Value (sen)"],
+  },
+  supplier_returns: {
+    title: "Supplier returns",
+    description:
+      "Current status of all supplier returns. Rejected stock is recorded as a loss at its original batch cost.",
+    columns: [
+      "Return",
+      "SKU",
+      "Name",
+      "Supplier",
+      "Status",
+      "Quantity",
+      "Classification",
+      "Loss value (sen)",
+      "Created at",
+    ],
   },
   movements: {
     title: "Stock movements",
@@ -73,10 +99,12 @@ const reports = {
 type Kind = keyof typeof reports;
 type ExportKind = Kind | "valuation";
 const isSnapshot = (kind: ExportKind) =>
-  ["current", "low", "valuation"].includes(kind);
+  ["current", "low", "valuation", "supplier_returns"].includes(kind);
 const params = (kind: ExportKind, range: Range) =>
   new URLSearchParams({ kind, ...(isSnapshot(kind) ? {} : range) }).toString();
 const number = new Intl.NumberFormat("en-MY");
+const count = (value: number, unit: string) =>
+  `${number.format(value)} ${unit}${value === 1 ? "" : "s"}`;
 
 function defaultRange(timezone: string): Range {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -115,7 +143,7 @@ function ReportSection({
   function cell(key: string, value: ReportRow[string]) {
     if (value === null) return "—";
     if (key.endsWith("(sen)")) return money(Number(value));
-    if (key === "Occurred at")
+    if (key === "Occurred at" || key === "Created at")
       return new Intl.DateTimeFormat("en-MY", {
         timeZone: meta.timezone,
         day: "numeric",
@@ -125,6 +153,16 @@ function ReportSection({
         minute: "2-digit",
       }).format(new Date(String(value)));
     if (key === "Type") return label(String(value));
+    if (key === "Status")
+      return (
+        <span
+          className={`badge ${value === "process" ? "amber" : value === "rejected" ? "red" : "green"}`}
+        >
+          {value === "process" ? "Processing" : label(String(value))}
+        </span>
+      );
+    if (key === "Classification" && value === "Loss")
+      return <span className="report-loss-label">Loss</span>;
     return typeof value === "number" ? number.format(value) : value;
   }
   const body = (
@@ -146,6 +184,7 @@ function ReportSection({
                         "Change",
                         "Value (sen)",
                         "Total cost (sen)",
+                        "Loss value (sen)",
                       ].includes(key)
                         ? "report-number"
                         : undefined
@@ -183,9 +222,11 @@ function ReportSection({
           title={
             kind === "low"
               ? "No low-stock items"
-              : isSnapshot(kind)
-                ? "No items to report"
-                : "No activity in this period"
+              : kind === "supplier_returns"
+                ? "No supplier returns"
+                : isSnapshot(kind)
+                  ? "No items to report"
+                  : "No activity in this period"
           }
           text={
             kind === "low"
@@ -319,7 +360,9 @@ export function Reports() {
       >
         <div className="report-filter-intro">
           <strong>Activity period</strong>
-          <span>Stock balances show the current snapshot.</span>
+          <span>
+            Stock balances and supplier returns show the current snapshot.
+          </span>
         </div>
         <Field label="From">
           <input
@@ -402,6 +445,73 @@ export function Reports() {
                 </section>
               ))}
             </div>
+            <section
+              className="report-return-summary"
+              aria-labelledby="return-summary-title"
+            >
+              <div className="report-summary-heading">
+                <h2 id="return-summary-title">Supplier return summary</h2>
+                <p>
+                  Current snapshot · Includes all supplier returns, regardless
+                  of activity dates.
+                </p>
+              </div>
+              <div className="report-return-layout">
+                <SupplierReturnPie data={overview.data.supplier_returns} />
+                <div className="report-metrics">
+                  {[
+                    {
+                      title: "Processing",
+                      value: count(
+                        overview.data.supplier_returns.process.quantity,
+                        "unit",
+                      ),
+                      note: `${count(overview.data.supplier_returns.process.returns, "return")} · Frozen from use`,
+                      icon: Snowflake,
+                    },
+                    {
+                      title: "Delivered",
+                      value: count(
+                        overview.data.supplier_returns.delivered.quantity,
+                        "unit",
+                      ),
+                      note: `${count(overview.data.supplier_returns.delivered.returns, "return")} · Deducted from stock`,
+                      icon: PackageCheck,
+                    },
+                    {
+                      title: "Rejected",
+                      value: count(
+                        overview.data.supplier_returns.rejected.quantity,
+                        "unit",
+                      ),
+                      note: `${count(overview.data.supplier_returns.rejected.returns, "return")} · Counted as loss`,
+                      icon: CircleX,
+                      loss: true,
+                    },
+                    {
+                      title: "Rejected stock loss",
+                      value: money(overview.data.supplier_returns.loss.value),
+                      note: `${count(overview.data.supplier_returns.loss.quantity, "unit")} · Original batch costs`,
+                      icon: Wallet,
+                      loss: true,
+                    },
+                  ].map((metric) => (
+                    <section
+                      className={`panel report-metric${metric.loss ? " loss" : ""}`}
+                      aria-label={metric.title}
+                      key={metric.title}
+                    >
+                      <div>
+                        <span>{metric.title}</span>
+                        <metric.icon size={18} />
+                      </div>
+                      <strong>{metric.value}</strong>
+                      <small>{metric.note}</small>
+                    </section>
+                  ))}
+                </div>
+              </div>
+            </section>
             <div className="report-charts-grid">
               <MovementTrend key={range.from + range.to} data={overview.data} />
               <CategoryValue categories={overview.data.categories} />
@@ -411,6 +521,7 @@ export function Reports() {
       </Status>
       {section("current")}
       {section("low")}
+      {section("supplier_returns")}
       {section(
         "reasons",
         overview.data && !overview.loading && !overview.error ? (

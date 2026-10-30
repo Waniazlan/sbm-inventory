@@ -79,7 +79,7 @@ class StockCostTest extends TestCase
         $this->record('manual_out', 4);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()
             ->assertJsonPath('stock', 7)
-            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace(array_intersect_key($row, array_flip(['supplier_id', 'supplier_name', 'quantity'])), ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [
                 ['supplier_id' => $this->supplier->id, 'supplier_name' => 'Supplier A', 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]],
                 ['supplier_id' => $other->id, 'supplier_name' => 'Supplier B', 'quantity' => 4, 'brands' => [['brand' => null, 'quantity' => 4]]],
                 ['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]],
@@ -89,12 +89,12 @@ class StockCostTest extends TestCase
             ->assertJsonCount(2, 'supplier_stock')->assertJsonPath('supplier_stock.0.supplier_id', $other->id);
         $this->record('reversal', 4, ['movement_id' => $receiptB->id]);
         $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 2)
-            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]]]);
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace(array_intersect_key($row, array_flip(['supplier_id', 'supplier_name', 'quantity'])), ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 2, 'brands' => [['brand' => null, 'quantity' => 2]]]]);
     }
 
     public function test_product_details_with_no_stock_have_an_empty_supplier_breakdown(): void
     {
-        $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 0)->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === []);
+        $this->getJson('/api/v1/items/'.$this->item->id)->assertOk()->assertJsonPath('stock', 0)->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace(array_intersect_key($row, array_flip(['supplier_id', 'supplier_name', 'quantity'])), ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === []);
     }
 
     public function test_product_details_show_receipt_brands_per_supplier_and_remaining_quantities(): void
@@ -237,7 +237,7 @@ class StockCostTest extends TestCase
         $this->getJson('/api/v1/items/'.$this->item->id.'/batches')->assertForbidden();
         $this->getJson('/api/v1/items')->assertJsonMissingPath('data.0.cost')->assertJsonMissingPath('data.0.stock_value');
         $this->getJson('/api/v1/items/'.$this->item->id)->assertJsonMissingPath('cost')->assertJsonMissingPath('stock_value')
-            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace($row, ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]]])
+            ->assertJsonPath('supplier_stock', fn ($rows) => collect($rows)->map(fn ($row) => array_replace(array_intersect_key($row, array_flip(['supplier_id', 'supplier_name', 'quantity'])), ['brands' => collect($row['brands'])->map(fn ($brand) => array_intersect_key($brand, array_flip(['brand', 'quantity'])))->all()]))->all() === [['supplier_id' => null, 'supplier_name' => null, 'quantity' => 1, 'brands' => [['brand' => null, 'quantity' => 1]]]])
             ->assertJsonMissingPath('supplier_stock.0.unit_cost');
         $this->getJson('/api/v1/dashboard')->assertJsonPath('valuation', null);
     }
@@ -266,8 +266,11 @@ class StockCostTest extends TestCase
         $this->item->update(['cost' => 99000]);
         $history = Movement::orderBy('id')->get()->toArray();
         $migration = require database_path('migrations/2026_10_25_000001_create_stock_batches.php');
+        $reservations = require database_path('migrations/2026_10_30_000001_create_stock_reservations.php');
+        $reservations->down();
         $migration->down();
         $migration->up();
+        $reservations->up();
         $this->assertSame($history, Movement::orderBy('id')->get()->toArray());
         $this->assertSame(27000, $this->value());
         $this->assertSame([12000, 13500], StockBatch::orderBy('id')->pluck('unit_cost')->all());
@@ -284,8 +287,11 @@ class StockCostTest extends TestCase
         $this->record('return', 1, ['serials' => 'MIGRATE-B', 'original_reference' => 'OLD-SERIAL'], 'sales');
         $legacy = Item::create(['name' => 'Unrecorded opening stock', 'category_id' => $this->item->category_id, 'cost' => 500, 'stock' => 3]);
         $migration = require database_path('migrations/2026_10_25_000001_create_stock_batches.php');
+        $reservations = require database_path('migrations/2026_10_30_000001_create_stock_reservations.php');
+        $reservations->down();
         $migration->down();
         $migration->up();
+        $reservations->up();
         $this->assertSame(27000, $this->value());
         $this->assertDatabaseHas('stock_batches', ['item_id' => $legacy->id, 'quantity' => 3, 'unit_cost' => 500, 'cost_source' => 'opening_standard_cost']);
         $serial = ItemUnit::where('serial_number', 'MIGRATE-B')->firstOrFail();

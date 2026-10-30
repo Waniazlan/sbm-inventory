@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\Movement;
 use App\Models\StockBatch;
 use App\Services\Ledger;
+use App\Services\SupplierReturnReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -40,6 +41,9 @@ class StockController
             $rules['items'] = 'prohibited';
         }
         $d = $r->validate($rules);
+        if ($d['kind'] === 'reversal') {
+            abort_if(Movement::whereKey($d['movement_id'])->where('type', 'supplier_return')->exists(), 422, 'Update the return status on the Supplier returns page to change its stock state.');
+        }
         if ($d['kind'] === 'receipt') {
             abort_unless(! empty($d['supplier_id']) || ! empty($d['reference']), 422, 'A receipt requires a supplier or reference.');
             $d['reason'] ??= 'Stock received from supplier';
@@ -112,11 +116,14 @@ class StockController
         return AuditLog::orderByDesc('id')->paginate(30);
     }
 
-    public function report(Request $r)
+    public function report(Request $r, SupplierReturnReport $returns)
     {
-        $r->validate(['kind' => 'required|in:current,low,movements,reasons,repairs,sales,valuation', 'format' => 'nullable|in:csv', 'per_page' => 'nullable|integer|min:5|max:100']);
+        $r->validate(['kind' => 'required|in:current,low,movements,reasons,repairs,sales,valuation,supplier_returns', 'format' => 'nullable|in:csv', 'per_page' => 'nullable|integer|min:5|max:100']);
         $kind = $r->input('kind');
-        if (in_array($kind, ['current', 'low', 'valuation'])) {
+        if ($kind === 'supplier_returns') {
+            $q = $returns->query()->with(['item:id,sku,name', 'supplier:id,name'])->orderByDesc('supplier_returns.id');
+            $map = fn ($return) => $returns->row($return);
+        } elseif (in_array($kind, ['current', 'low', 'valuation'])) {
             if ($kind === 'low') {
                 $r->merge(['status' => 'low']);
             }$q = CatalogueController::query($r)->orderBy('sku');

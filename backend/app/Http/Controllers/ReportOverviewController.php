@@ -5,12 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Item;
 use App\Models\Movement;
 use App\Models\StockBatch;
+use App\Services\SupplierReturnReport;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 
 class ReportOverviewController
 {
-    public function __invoke(Request $request): array
+    public function __invoke(Request $request, SupplierReturnReport $returns): array
     {
         $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d']);
         $timezone = config('sbm.timezone');
@@ -55,6 +56,7 @@ class ReportOverviewController
             'from' => $from->toDateString(), 'to' => $to->toDateString(), 'timezone' => $timezone, 'interval' => $interval,
             'stock' => ['items' => (int) $stock->items, 'units' => (int) $stock->units, 'low_stock' => (int) $stock->low_stock, 'value' => (int) $categories->sum('value')],
             'activity' => ['movements' => (int) $totals->movements, 'stock_in' => (int) $totals->stock_in, 'stock_out' => (int) $totals->stock_out],
+            'supplier_returns' => $returns->summary(),
             'series' => $series, 'categories' => $categories, 'reasons' => $reasons,
         ];
     }

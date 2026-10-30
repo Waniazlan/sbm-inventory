@@ -8,6 +8,7 @@ use App\Http\Controllers\LoginBackgroundController;
 use App\Http\Controllers\RepairUsageReversalController;
 use App\Http\Controllers\ReportOverviewController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\SupplierReturnController;
 use App\Services\Ledger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,10 @@ Route::prefix('v1')->group(function () {
         Route::get('movements', [StockController::class, 'index']);
         Route::post('movements', [StockController::class, 'post']);
         Route::middleware('admin')->group(function () {
+            Route::get('supplier-returns/lookup', [SupplierReturnController::class, 'lookup']);
+            Route::get('supplier-returns', [SupplierReturnController::class, 'index']);
+            Route::post('supplier-returns', [SupplierReturnController::class, 'store']);
+            Route::put('supplier-returns/{supplierReturn}', [SupplierReturnController::class, 'update'])->whereNumber('supplierReturn');
             Route::get('settings/labels', [LabelSettingsController::class, 'show']);
             Route::put('settings/labels', [LabelSettingsController::class, 'update']);
             Route::post('settings/login-background', [LoginBackgroundController::class, 'store']);

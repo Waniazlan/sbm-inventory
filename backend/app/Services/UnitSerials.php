@@ -98,6 +98,9 @@ class UnitSerials
                 }
             }
         }
+        if ($movement->delta < 0 && ItemUnit::available()->whereIn('id', $units->pluck('id'))->count() !== $units->count()) {
+            throw ValidationException::withMessages(['serials' => 'This unit is frozen for a Process supplier return and cannot be used.']);
+        }
         foreach ($units as $unit) {
             $previous = $unit->last_movement_id;
             $last = $reversal

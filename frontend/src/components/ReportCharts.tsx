@@ -7,12 +7,187 @@ export type ReportOverview = {
   timezone: string;
   interval: "day" | "week" | "month";
   stock: { items: number; units: number; low_stock: number; value: number };
+  supplier_returns: {
+    process: { returns: number; quantity: number };
+    delivered: { returns: number; quantity: number };
+    rejected: { returns: number; quantity: number };
+    loss: { quantity: number; value: number };
+  };
   activity: { movements: number; stock_in: number; stock_out: number };
   series: { date: string; stock_in: number; stock_out: number }[];
   categories: { name: string; units: number; value: number }[];
   reasons: { type: string; reason: string; quantity: number }[];
 };
 const number = new Intl.NumberFormat("en-MY");
+const percentage = new Intl.NumberFormat("en-MY", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+
+export function SupplierReturnPie({
+  data,
+}: {
+  data: ReportOverview["supplier_returns"];
+}) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const rows = [
+    {
+      status: "process",
+      name: "Processing",
+      quantity: data.process.quantity,
+      colour: "#b58a2d",
+    },
+    {
+      status: "delivered",
+      name: "Delivered",
+      quantity: data.delivered.quantity,
+      colour: "#39775a",
+    },
+    {
+      status: "rejected",
+      name: "Rejected",
+      quantity: data.rejected.quantity,
+      colour: "#bb4f46",
+    },
+  ];
+  const total = rows.reduce((sum, row) => sum + row.quantity, 0);
+  const active = total
+    ? rows.find((row) => row.status === selected) ||
+      rows.find((row) => row.quantity > 0)
+    : undefined;
+  let angle = -Math.PI / 2;
+  const slices = rows
+    .filter((row) => row.quantity > 0)
+    .map((row) => {
+      const start = angle;
+      const sweep = (row.quantity / total) * Math.PI * 2;
+      angle += sweep;
+      const point = (a: number, radius = 100) => [
+        120 + radius * Math.cos(a),
+        120 + radius * Math.sin(a),
+      ];
+      const [startX, startY] = point(start);
+      const [endX, endY] = point(angle);
+      const [labelX, labelY] =
+        row.quantity === total ? [120, 120] : point(start + sweep / 2, 64);
+      return {
+        ...row,
+        path: `M 120 120 L ${startX} ${startY} A 100 100 0 ${sweep > Math.PI ? 1 : 0} 1 ${endX} ${endY} Z`,
+        labelX,
+        labelY,
+      };
+    });
+  const units = (quantity: number) =>
+    `${number.format(quantity)} unit${quantity === 1 ? "" : "s"}`;
+  const share = (quantity: number) =>
+    percentage.format(total ? quantity / total : 0);
+
+  return (
+    <div
+      className="panel report-return-pie"
+      role="group"
+      aria-label="Supplier return status pie chart"
+    >
+      <div className="report-card-heading">
+        <div>
+          <h3>Return status distribution</h3>
+          <p>Share of {units(total)} by current status</p>
+        </div>
+      </div>
+      <div className="report-return-pie-body">
+        <svg
+          viewBox="0 0 240 240"
+          role="img"
+          aria-label={rows
+            .map(
+              (row) =>
+                `${row.name}: ${units(row.quantity)}, ${share(row.quantity)}`,
+            )
+            .join("; ")}
+        >
+          {!total && <circle cx="120" cy="120" r="100" fill="#edf1ed" />}
+          {slices.map((slice) => (
+            <g
+              key={slice.status}
+              className={`report-pie-slice${active?.status === slice.status ? " active" : ""}`}
+              onMouseEnter={() => setSelected(slice.status)}
+            >
+              {slice.quantity === total ? (
+                <circle
+                  cx="120"
+                  cy="120"
+                  r="100"
+                  fill={slice.colour}
+                  data-status={slice.status}
+                />
+              ) : (
+                <path
+                  d={slice.path}
+                  fill={slice.colour}
+                  data-status={slice.status}
+                />
+              )}
+              {slice.quantity / total >= 0.08 && (
+                <text
+                  x={slice.labelX}
+                  y={slice.labelY}
+                  fill={slice.status === "process" ? "#203225" : "#fff"}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  aria-hidden="true"
+                >
+                  {share(slice.quantity)}
+                </text>
+              )}
+            </g>
+          ))}
+          {!total && (
+            <text
+              x="120"
+              y="120"
+              textAnchor="middle"
+              dominantBaseline="middle"
+              className="report-pie-zero"
+            >
+              0 units
+            </text>
+          )}
+        </svg>
+        <ul className="report-pie-legend" aria-label="Return status breakdown">
+          {rows.map((row) => (
+            <li key={row.status}>
+              <button
+                type="button"
+                aria-label={`${row.name}: ${units(row.quantity)}, ${share(row.quantity)}`}
+                aria-pressed={active?.status === row.status}
+                onMouseEnter={() => setSelected(row.status)}
+                onFocus={() => setSelected(row.status)}
+                onClick={() => setSelected(row.status)}
+              >
+                <span
+                  className="report-pie-key"
+                  style={{ background: row.colour }}
+                  aria-hidden="true"
+                />
+                <span>
+                  <strong>{row.name}</strong>
+                  <small>{units(row.quantity)}</small>
+                </span>
+                <b>{share(row.quantity)}</b>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <p className="report-pie-selection" role="status">
+        {active
+          ? `${active.name} · ${units(active.quantity)} · ${share(active.quantity)}`
+          : "No supplier returns to chart."}
+      </p>
+    </div>
+  );
+}
+
 export function chartDate(date: string) {
   return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-MY", {
     day: "numeric",

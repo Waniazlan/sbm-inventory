@@ -47,6 +47,12 @@ export function ItemDetails({
                   Status: product.active ? "Active" : "Inactive",
                   Barcode: product.barcode || "Not assigned",
                   Stock: `${product.stock} ${product.unit}(s)`,
+                  ...(product.frozen_stock
+                    ? {
+                        "Frozen for supplier returns": product.frozen_stock,
+                        "Available stock": product.available_stock,
+                      }
+                    : {}),
                   Part: product.part_number,
                   Colour: product.colour,
                   Grade: product.grade,

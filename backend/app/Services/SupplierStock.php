@@ -25,12 +25,16 @@ class SupplierStock
 
     public function summary(Item $item, bool $admin): Collection
     {
+        $frozen = StockAvailability::reservedByBatch($item->id);
+
         return $this->batches($item)->groupBy(fn ($batch) => $batch->supplier_id ?? 'unknown')
             ->sortBy(fn ($batches) => $batches->first()->supplier_id ?? PHP_INT_MAX)
             ->map(fn ($batches) => [
                 'supplier_id' => $batches->first()->supplier_id,
                 'supplier_name' => $batches->first()->supplier?->name,
                 'quantity' => (int) $batches->sum('remaining_quantity'),
+                'frozen_quantity' => (int) $batches->sum(fn ($batch) => $frozen[$batch->id] ?? 0),
+                'available_quantity' => (int) $batches->sum(fn ($batch) => $batch->remaining_quantity - ($frozen[$batch->id] ?? 0)),
                 'brands' => $batches->groupBy(fn ($batch) => json_encode($batch->effective_brand))
                     ->sortBy(fn ($group) => $group->first()->effective_brand ?? "\xff")
                     ->map(fn ($group) => [

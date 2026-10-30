@@ -26,7 +26,7 @@ class StockCosts
         StockBatch::create(['item_id' => $item->id, 'supplier_id' => $item->supplier_id, 'reference' => 'Opening stock without receipt history', 'cost_source' => 'opening_standard_cost', 'unit_cost' => $item->cost, 'quantity' => $quantity, 'remaining_quantity' => $quantity, 'received_at' => $item->created_at ?? now()]);
     }
 
-    public function plan(Item $item, Movement $movement, ?Movement $reversal = null, ?array $batchIds = null): array
+    public function plan(Item $item, Movement $movement, ?Movement $reversal = null, ?array $batchIds = null, ?array $batchQuantities = null): array
     {
         if ($reversal) {
             $plan = $reversal->costAllocations()->with('batch')->orderBy('id')->get()->map(fn ($a) => ['batch' => $a->batch, 'quantity' => -$a->quantity, 'return_of_id' => $a->return_of_id])->all();
@@ -48,6 +48,23 @@ class StockCosts
             return $this->returned($item, $movement, $units);
         }
 
+        $frozen = StockAvailability::reservedByBatch($item->id);
+        if ($batchQuantities !== null) {
+            $plan = [];
+            foreach ($batchQuantities as $id => $quantity) {
+                $batch = StockBatch::where('item_id', $item->id)->findOrFail($id);
+                if ($quantity < 1 || $quantity > $batch->remaining_quantity - ($frozen[$id] ?? 0)) {
+                    $this->fail('The frozen batch quantities are no longer available.');
+                }
+                $plan[] = ['batch' => $batch, 'quantity' => -(int) $quantity, 'return_of_id' => null];
+            }
+            if (array_sum(array_column($plan, 'quantity')) !== $movement->delta) {
+                $this->fail('Frozen quantities do not match this return.');
+            }
+
+            return $plan;
+        }
+
         $plan = [];
         $remaining = $movement->quantity;
         // A scanned physical unit always takes its own batch, even if it is newer.
@@ -62,7 +79,7 @@ class StockCosts
         // FIFO follows posting order; backdated paperwork must not rewrite previous costs.
         foreach ($item->batches()->where('remaining_quantity', '>', 0)->when($batchIds !== null, fn ($q) => $q->whereIn('id', $batchIds))->orderBy('id')->get() as $batch) {
             $reserved = isset($plan[$batch->id]) ? -$plan[$batch->id]['quantity'] : 0;
-            $take = min($remaining, $batch->remaining_quantity - $reserved);
+            $take = min($remaining, $batch->remaining_quantity - ($frozen[$batch->id] ?? 0) - $reserved);
             if ($take > 0) {
                 $plan[$batch->id] = ['batch' => $batch, 'quantity' => -($reserved + $take), 'return_of_id' => null];
                 $remaining -= $take;
@@ -72,7 +89,7 @@ class StockCosts
             }
         }
         if ($remaining !== 0) {
-            $this->fail('Batch quantities do not cover this stock movement.');
+            $this->fail('Available batch quantities do not cover this stock movement. Frozen stock cannot be used.');
         }
 
         return array_values($plan);
@@ -104,9 +121,13 @@ class StockCosts
 
     public function apply(Item $item, Movement $movement, array $plan): void
     {
+        $frozen = StockAvailability::reservedByBatch($item->id);
         foreach ($plan as $row) {
             $batch = StockBatch::findOrFail($row['batch']->id);
             $remaining = $batch->remaining_quantity + $row['quantity'];
+            if (($frozen[$batch->id] ?? 0) > 0 && $remaining < $frozen[$batch->id]) {
+                $this->fail('This movement would use stock frozen for a Process supplier return.');
+            }
             if ($remaining < 0 || $remaining > $batch->quantity) {
                 $this->fail('This batch has later stock movements. Reverse those movements first.');
             }

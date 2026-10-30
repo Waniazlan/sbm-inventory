@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import {
   ArrowLeftRight,
+  Undo2,
   BarChart3,
   Check,
   LayoutDashboard,
@@ -33,6 +34,7 @@ import { Movements } from "./pages/Movements";
 import { Overview } from "./pages/Overview";
 import { Reports } from "./pages/Reports";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SupplierReturns } from "./pages/SupplierReturns";
 export { Login } from "./pages/Login";
 export function Shell({
   user,
@@ -96,6 +98,12 @@ export function Shell({
   const links = [
     { to: "/", name: "Overview", icon: LayoutDashboard },
     { to: "/catalogue", name: "Item catalogue", icon: Package },
+    {
+      to: "/supplier-returns",
+      name: "Supplier returns",
+      icon: Undo2,
+      admin: true,
+    },
     { to: "/movements", name: "Movement ledger", icon: ArrowLeftRight },
     { to: "/low-stock", name: "Low-stock watch", icon: TriangleAlert },
     { to: "/reports", name: "Reports", icon: BarChart3, admin: true },
@@ -206,6 +214,10 @@ export function Shell({
                   <Route path="/movements" element={<Movements />} />
                   {user.role === "admin" && (
                     <>
+                      <Route
+                        path="/supplier-returns"
+                        element={<SupplierReturns />}
+                      />
                       <Route path="/reports" element={<Reports />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/integrations" element={<Integrations />} />

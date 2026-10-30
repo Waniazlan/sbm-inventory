@@ -10,6 +10,7 @@ use App\Models\StockBatch;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Audit;
+use App\Services\StockAvailability;
 use App\Services\StockCosts;
 use App\Services\SupplierStock;
 use App\Services\UnitSerials;
@@ -63,6 +64,8 @@ class CatalogueController
     public static function present(Item $i, bool $cost = true): array
     {
         $d = $i->toArray();
+        $d['frozen_stock'] = StockAvailability::reserved($i);
+        $d['available_stock'] = $i->stock - $d['frozen_stock'];
         if (! $cost) {
             unset($d['cost'], $d['stock_value']);
         }
@@ -161,7 +164,7 @@ class CatalogueController
             ->leftJoinSub(StockBatch::withBrand(), 'label_batch', fn ($join) => $join->on('label_batch.id', '=', 'item_units.stock_batch_id'))
             ->select('item_units.*', 'label_batch.effective_brand as brand')
             ->where('item_units.item_id', $item->id)
-            ->when($r->filled('state'), fn ($q) => $q->where('in_stock', $r->input('state') === 'available'))
+            ->when($r->filled('state'), fn ($q) => $r->input('state') === 'available' ? $q->available() : $q->where('in_stock', false))
             ->when($r->filled('search'), fn ($q) => $q->where('serial_number', 'ilike', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $r->input('search')).'%'))
             ->orderByDesc('item_units.id')->paginate(50);
     }
@@ -208,6 +211,9 @@ class CatalogueController
                     throw ValidationException::withMessages(['serial_tracking' => 'Serial tracking cannot be disabled after it has been enabled.']);
                 }
                 $enableSerials = ($d['serial_tracking'] ?? false) && ! $item?->serial_tracking;
+                if ($enableSerials && $item && StockAvailability::reserved($item) > 0) {
+                    throw ValidationException::withMessages(['serial_tracking' => 'Complete Process supplier returns before enabling individual serial tracking.']);
+                }
                 if ($enableSerials && ($item?->stock ?? 0) > 1000) {
                     throw ValidationException::withMessages(['serial_tracking' => 'Enable tracking for products with at most 1,000 existing units.']);
                 }

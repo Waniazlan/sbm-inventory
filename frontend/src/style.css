@@ -480,6 +480,22 @@ strong {
   overflow-x: auto;
   width: 100%;
 }
+.return-serials {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.return-item-scan {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.return-selected-item {
+  justify-content: space-between;
+}
+.return-selected-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 table {
   width: 100%;
   border-collapse: collapse;
@@ -549,6 +565,13 @@ td .inline {
   font-size: 12px;
   min-height: 34px;
   padding: 7px 11px;
+}
+.supplier-return-actions {
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fafcf9;
 }
 .row-actions .catalogue-action {
   position: relative;

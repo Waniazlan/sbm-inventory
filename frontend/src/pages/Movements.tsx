@@ -70,6 +70,7 @@ export function Movements() {
               "manual_out",
               "adjustment",
               "return",
+              "supplier_return",
               "reversal",
             ].map((t) => (
               <option key={t} value={t}>

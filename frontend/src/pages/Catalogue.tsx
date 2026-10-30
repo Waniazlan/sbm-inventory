@@ -195,6 +195,12 @@ export function Catalogue({ low = false }: { low?: boolean }) {
                         <b>{i.stock}</b>{" "}
                         <small className="inline">{i.unit}(s)</small>
                         <small>Min. {i.minimum_stock}</small>
+                        {!!i.frozen_stock && (
+                          <small>
+                            {i.frozen_stock} frozen · {i.available_stock}{" "}
+                            available
+                          </small>
+                        )}
                       </td>
                       <td>
                         <StockBadge item={i} />
