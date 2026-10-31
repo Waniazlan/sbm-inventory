@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Item;
 use App\Models\ItemUnit;
 use App\Models\Operation;
+use App\Models\StockBatch;
 use App\Services\Ledger;
 use App\Services\StockAvailability;
 use App\Services\UnitSerials;
@@ -30,6 +31,22 @@ class IntegrationController
         abort_unless($item->active && $item->price !== null, 404);
 
         return ['data' => $this->product($item->load(['category', 'phoneModels']))];
+    }
+
+    public function units(Request $r, Item $item)
+    {
+        abort_unless($item->active && $item->price !== null && $item->serial_tracking, 404);
+        $r->validate(['search' => 'nullable|string|max:120', 'page' => 'nullable|integer|min:1|max:1000000']);
+        $units = ItemUnit::available()
+            ->leftJoinSub(StockBatch::withBrand(), 'label_batch', fn ($join) => $join->on('label_batch.id', '=', 'item_units.stock_batch_id'))
+            ->where('item_units.item_id', $item->id)
+            ->when($r->filled('search'), fn ($query) => $query->where('item_units.serial_number', 'ilike',
+                '%'.str_replace(['%', '_'], ['\\%', '\\_'], $r->input('search')).'%'))
+            ->orderBy('item_units.id')
+            ->paginate(50, ['item_units.id', 'item_units.serial_number', 'label_batch.effective_brand as brand']);
+        $units->through(fn ($unit) => ['id' => (string) $unit->id, 'serial_number' => $unit->serial_number, 'brand' => $unit->brand]);
+
+        return response()->json($units)->header('Cache-Control', 'no-store');
     }
 
     public function validateStock(Request $r)

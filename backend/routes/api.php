@@ -7,6 +7,7 @@ use App\Http\Controllers\LabelSettingsController;
 use App\Http\Controllers\LoginBackgroundController;
 use App\Http\Controllers\RepairUsageReversalController;
 use App\Http\Controllers\ReportOverviewController;
+use App\Http\Controllers\SalesCatalogueController;
 use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierReturnController;
 use App\Services\Ledger;
@@ -55,7 +56,10 @@ Route::prefix('v1')->group(function () {
     });
     Route::middleware(['integration:sales', 'throttle:120,1'])->group(function () {
         Route::get('health', fn () => ['status' => 'ok']);
+        Route::get('products/metadata', [SalesCatalogueController::class, 'metadata']);
+        Route::post('products/with-stock', [SalesCatalogueController::class, 'store']);
         Route::get('products', [IntegrationController::class, 'products']);
+        Route::get('products/{item}/units', [IntegrationController::class, 'units'])->whereNumber('item');
         Route::get('products/{item}', [IntegrationController::class, 'productShow']);
         Route::post('stock/validate', [IntegrationController::class, 'validateStock']);
         Route::post('stock/{direction}', [IntegrationController::class, 'post'])->whereIn('direction', ['in', 'out']);
