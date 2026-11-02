@@ -58,6 +58,12 @@ export function ItemDetails({
                   Grade: product.grade,
                   Capacity: product.capacity,
                   "Selling price": money(product.price),
+                  "Warranty duration":
+                    product.warranty_days == null
+                      ? "Not specified"
+                      : product.warranty_days === 0
+                        ? "No warranty"
+                        : `${product.warranty_days} ${product.warranty_days === 1 ? "day" : "days"}`,
                   ...(user.role === "admin"
                     ? { "Stock value": money(product.stock_value) }
                     : {}),

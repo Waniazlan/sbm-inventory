@@ -38,6 +38,9 @@ export function ItemForm({
       capacity: text("capacity"),
       unit: text("unit"),
       price: text("price") ? Math.round(Number(text("price")) * 100) : null,
+      warranty_days: text("warranty_days")
+        ? Number(text("warranty_days"))
+        : null,
       minimum_stock: Number(text("minimum_stock")),
       active: form.get("active") === "on",
       notes: text("notes"),
@@ -174,6 +177,17 @@ export function ItemForm({
                 step="0.01"
                 defaultValue={item?.price == null ? "" : item.price / 100}
                 placeholder="Optional; needed for POS"
+              />
+            </Field>
+            <Field label="Warranty duration (days)">
+              <input
+                name="warranty_days"
+                type="number"
+                min="0"
+                max="36500"
+                step="1"
+                defaultValue={item?.warranty_days ?? ""}
+                placeholder="Optional; 0 for no warranty"
               />
             </Field>
             <Field label="Minimum stock">

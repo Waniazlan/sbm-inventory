@@ -190,7 +190,10 @@ class CatalogueController
         // SKUs are assigned on creation and cannot be changed through the API.
         $d = $r->validate(['name' => 'required|string|max:200', 'category_id' => 'required|exists:categories,id', 'supplier_id' => 'nullable|exists:suppliers,id', 'brand' => 'nullable|string|max:100', 'part_number' => 'nullable|string|max:100', 'colour' => 'nullable|string|max:80', 'capacity' => 'nullable|string|max:80', 'grade' => 'nullable|string|max:80', 'unit' => 'required|in:piece,set,pack', 'cost' => 'sometimes|integer|min:0|max:100000000', 'price' => 'nullable|integer|min:0|max:100000000', 'minimum_stock' => 'required|integer|min:0|max:100000000', 'active' => 'required|boolean', 'notes' => 'nullable|string|max:2000', 'phone_model_ids' => 'present|array|max:100', 'phone_model_ids.*' => 'required|integer|distinct|exists:phone_models,id']);
 
-        $d = array_merge($d, $barcode, $r->validate(['serial_tracking' => 'sometimes|boolean']));
+        $d = array_merge($d, $barcode, $r->validate([
+            'serial_tracking' => 'sometimes|boolean',
+            'warranty_days' => 'nullable|integer|min:0|max:36500',
+        ]));
 
         try {
             return DB::transaction(function () use ($d, $item) {

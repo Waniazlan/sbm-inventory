@@ -47,6 +47,7 @@ export type Item = {
   cost?: number;
   stock_value?: number;
   price: number | null;
+  warranty_days: number | null;
   minimum_stock: number;
   stock: number;
   available_stock?: number;

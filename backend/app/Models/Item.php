@@ -31,7 +31,7 @@ class Item extends Model
 
     protected function casts(): array
     {
-        return ['barcode' => 'string', 'serial_tracking' => 'boolean', 'active' => 'boolean', 'cost' => 'integer', 'stock_value' => 'integer', 'price' => 'integer', 'stock' => 'integer'];
+        return ['barcode' => 'string', 'serial_tracking' => 'boolean', 'active' => 'boolean', 'cost' => 'integer', 'stock_value' => 'integer', 'price' => 'integer', 'warranty_days' => 'integer', 'stock' => 'integer'];
     }
 
     public function category()
