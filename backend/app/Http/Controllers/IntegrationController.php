@@ -15,7 +15,7 @@ class IntegrationController
 {
     private function product(Item $i)
     {
-        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'stock' => StockAvailability::available($i), 'on_hand_stock' => $i->stock, 'frozen_stock' => StockAvailability::reserved($i), 'barcode' => $i->barcode, 'serial_tracking' => $i->serial_tracking, 'compatibility' => $i->phoneModels];
+        return ['id' => (string) $i->id, 'name' => $i->name, 'sku' => $i->sku, 'brand' => $i->brand, 'model' => $i->phoneModels->map(fn ($m) => $m->brand.' '.$m->name)->implode(', '), 'category' => $i->category->name, 'price' => $i->price, 'cost' => $i->cost, 'warranty_days' => $i->warranty_days, 'stock' => StockAvailability::available($i), 'on_hand_stock' => $i->stock, 'frozen_stock' => StockAvailability::reserved($i), 'barcode' => $i->barcode, 'serial_tracking' => $i->serial_tracking, 'compatibility' => $i->phoneModels];
     }
 
     public function products(Request $r)

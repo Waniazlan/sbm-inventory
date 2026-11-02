@@ -51,6 +51,23 @@ class ItemWarrantyTest extends TestCase
         $this->assertDatabaseHas('items', ['id' => $id, 'warranty_days' => 30]);
     }
 
+    #[DataProvider('integrationDurations')]
+    public function test_sales_product_list_and_detail_return_the_saved_warranty(?int $days): void
+    {
+        $id = $this->postJson('/api/v1/items', $this->payload + ['price' => 35, 'warranty_days' => $days])
+            ->assertCreated()->json('id');
+        $token = str_repeat('w', 40);
+        config(['sbm.sales_token' => $token]);
+        $this->getJson('/api/v1/products/'.$id)->assertUnauthorized();
+        $this->withToken($token)->getJson('/api/v1/products/'.$id)->assertOk()->assertJsonPath('data.warranty_days', $days);
+        $this->getJson('/api/v1/products')->assertOk()->assertJsonPath('data.0.warranty_days', $days);
+    }
+
+    public static function integrationDurations(): array
+    {
+        return [[90], [1], [36500], [0], [null]];
+    }
+
     #[DataProvider('invalidDurations')]
     public function test_invalid_durations_are_rejected_on_create_and_update(mixed $duration): void
     {
