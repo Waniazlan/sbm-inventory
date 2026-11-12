@@ -6,6 +6,7 @@ use App\Http\Controllers\IntegrationController;
 use App\Http\Controllers\ItemLookupController;
 use App\Http\Controllers\LabelSettingsController;
 use App\Http\Controllers\LoginBackgroundController;
+use App\Http\Controllers\ProfilePictureController;
 use App\Http\Controllers\RepairUsageReversalController;
 use App\Http\Controllers\ReportOverviewController;
 use App\Http\Controllers\SalesCatalogueController;
@@ -21,6 +22,11 @@ Route::prefix('v1')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login'])->middleware(['web', 'throttle:login']);
     Route::middleware(['auth:sanctum', 'active', 'throttle:120,1'])->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']);
+        Route::put('auth/profile', [AuthController::class, 'updateProfile']);
+        Route::post('auth/profile/picture', [ProfilePictureController::class, 'store']);
+        Route::delete('auth/profile/picture', [ProfilePictureController::class, 'destroy']);
+        Route::get('auth/profile/picture/{token}', [ProfilePictureController::class, 'show'])->whereUuid('token')->name('profile.picture');
+        Route::put('auth/password', [AuthController::class, 'updatePassword'])->middleware('throttle:6,1,password-change:');
         Route::post('auth/logout', [AuthController::class, 'logout'])->middleware('web');
         Route::get('dashboard', [StockController::class, 'dashboard']);
         Route::get('metadata', [CatalogueController::class, 'metadata']);

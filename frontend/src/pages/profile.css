@@ -1,0 +1,24 @@
+.profile-settings {
+  display: grid;
+  gap: 24px;
+  max-width: 680px;
+}
+
+.profile-settings .panel-title p {
+  overflow-wrap: anywhere;
+}
+
+.profile-settings .profile-picture-avatar {
+  width: 88px;
+  height: 88px;
+  font-size: 28px;
+}
+
+.profile-picture-actions {
+  flex-wrap: wrap;
+}
+
+.profile-settings input[type="file"] {
+  width: 100%;
+  min-width: 0;
+}

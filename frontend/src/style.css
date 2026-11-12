@@ -223,6 +223,12 @@ strong {
   background: #e9eee4;
   border: 3px solid #f7f8f5;
 }
+.avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+}
 .main-shell {
   margin-left: 200px;
   width: calc(100% - 200px);

@@ -11,6 +11,8 @@ Inventory Management for the SBM phone repair shop suite. Laravel 12 / PHP 8.4, 
 
 Use persistent PostgreSQL storage for ongoing work. The original development cluster at `/private/tmp/sbm-inventory-pg` on port `55440` used temporary storage and may disappear when temporary files are cleared. The current local setup uses Homebrew PostgreSQL 16 storage at `/opt/homebrew/var/postgresql@16`; the supplied Docker configuration uses PostgreSQL 16 with a persistent volume.
 
+All active users can open **My profile** from the sidebar or header avatar to update their name, password and profile picture. Pictures accept JPG, PNG or WebP up to 5 MB and 4096 × 4096 pixels. Uploads use the private `PROFILE_PICTURE_DISK` (defaults to `rustfs`, using the existing RustFS configuration); authenticated picture routes serve only the signed-in user's picture. Replacing or removing a picture deletes the previous file. Run `php artisan migrate` in `backend` to add the profile picture columns on another installation.
+
 ## Workflows
 
 | Screen | Features |

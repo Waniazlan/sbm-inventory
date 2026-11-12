@@ -178,7 +178,7 @@ test("technicians keep their navigation and drawer state resets on desktop", asy
   const menu = page.getByRole("button", { name: "Open menu" });
   await menu.click();
   const navigation = page.getByRole("navigation", { name: "Main navigation" });
-  await expect(navigation.getByRole("link")).toHaveCount(4);
+  await expect(navigation.getByRole("link")).toHaveCount(5);
   for (const name of ["Settings", "Reports", "Integrations", "Repair parts"])
     await expect(
       navigation.getByRole("link", { name, exact: true }),

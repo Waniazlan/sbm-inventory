@@ -13,6 +13,7 @@ import {
   Plug,
   Settings,
   TriangleAlert,
+  UserRound,
   X,
 } from "lucide-react";
 import {
@@ -35,13 +36,17 @@ import { Overview } from "./pages/Overview";
 import { Reports } from "./pages/Reports";
 import { SettingsPage } from "./pages/SettingsPage";
 import { SupplierReturns } from "./pages/SupplierReturns";
+import { Profile } from "./pages/Profile";
+import { Avatar } from "./components/Avatar";
 export { Login } from "./pages/Login";
 export function Shell({
   user,
   logout,
+  updateUser,
 }: {
   user: User;
   logout: () => Promise<void>;
+  updateUser: (user: User) => void;
 }) {
   const metadata = useLoad<Metadata>("/metadata");
   const [toast, setToast] = useState(""),
@@ -109,6 +114,7 @@ export function Shell({
     { to: "/reports", name: "Reports", icon: BarChart3, admin: true },
     { to: "/integrations", name: "Integrations", icon: Plug, admin: true },
     { to: "/settings", name: "Settings", icon: Settings, admin: true },
+    { to: "/profile", name: "My profile", icon: UserRound },
   ];
   return (
     <div className="app-shell">
@@ -146,7 +152,7 @@ export function Shell({
         </nav>
         <div className="sidebar-bottom">
           <div className="profile">
-            <span className="avatar">{user.name.slice(0, 1)}</span>
+            <Avatar user={user} />
             <div>
               <strong title={user.name}>{user.name}</strong>
               <small>{label(user.role)}</small>
@@ -190,7 +196,9 @@ export function Shell({
             </span>
           </div>
           <div className="topbar-right">
-            <span className="avatar small-avatar">{user.name.slice(0, 1)}</span>
+            <Link to="/profile" aria-label="Open my profile">
+              <Avatar user={user} className="small-avatar" />
+            </Link>
           </div>
         </header>
         <main>
@@ -212,6 +220,10 @@ export function Shell({
                     element={<Catalogue low key="low" />}
                   />
                   <Route path="/movements" element={<Movements />} />
+                  <Route
+                    path="/profile"
+                    element={<Profile updateUser={updateUser} />}
+                  />
                   {user.role === "admin" && (
                     <>
                       <Route
@@ -291,6 +303,7 @@ export function App() {
   return user ? (
     <Shell
       user={user}
+      updateUser={setUser}
       logout={async () => {
         await api.post("/auth/logout");
         setUser(null);

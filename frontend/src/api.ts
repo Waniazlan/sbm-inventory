@@ -24,6 +24,7 @@ export type User = {
   email: string;
   role: "admin" | "technician";
   active: boolean;
+  avatar_url?: string | null;
 };
 export type Named = { id: number; name: string };
 export type Phone = Named & { brand: string };

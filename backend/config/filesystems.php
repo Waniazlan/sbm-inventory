@@ -17,6 +17,8 @@ return [
 
     'login_background_disk' => env('LOGIN_BACKGROUND_DISK', 'rustfs'),
 
+    'profile_picture_disk' => env('PROFILE_PICTURE_DISK', 'rustfs'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
