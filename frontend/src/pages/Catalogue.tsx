@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import {
   Barcode,
-  Camera,
   PackagePlus,
   Pencil,
   Plus,
@@ -15,7 +14,6 @@ import { ItemLabels } from "../components/ItemLabels";
 import { ItemForm } from "../components/ItemForm";
 import { ItemDetails } from "../components/ItemDetails";
 import { DeleteItem } from "../components/DeleteItem";
-import { BarcodeScanner } from "../components/BarcodeScanner";
 import {
   Button,
   Empty,
@@ -30,8 +28,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
   const { user, meta } = useApp();
   const [labels, setLabels] = useState<Item | null>(null);
   const [deleting, setDeleting] = useState<Item | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [scannedBarcode, setScannedBarcode] = useState("");
   const [search, setSearch] = useState(""),
     [sort, setSort] = useState("newest"),
     [status, setStatus] = useState(low ? "low" : ""),
@@ -41,9 +37,7 @@ export function Catalogue({ low = false }: { low?: boolean }) {
     [stock, setStock] = useState<{ kind: string; item: Item } | null>(null),
     [detail, setDetail] = useState<Item | null>(null);
   const q = useLoad<Page<Item>>(
-    scannedBarcode
-      ? `/items?barcode=${encodeURIComponent(scannedBarcode)}&sort=${sort}&page=${page}`
-      : `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&sort=${sort}&page=${page}`,
+    `/items?search=${encodeURIComponent(search)}&status=${status}&category_id=${category}&sort=${sort}&page=${page}`,
   );
   return (
     <>
@@ -56,9 +50,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
         }
         actions={
           <>
-            <Button variant="secondary" onClick={() => setScanning(true)}>
-              <Camera size={17} /> Scan barcode
-            </Button>
             {user.role === "admin" && (
               <Button onClick={() => setEdit("new")}>
                 <Plus size={17} />
@@ -78,7 +69,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
-                setScannedBarcode("");
                 setPage(1);
               }}
             />
@@ -106,7 +96,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             value={category}
             onChange={(e) => {
               setCategory(e.target.value);
-              setScannedBarcode("");
               setPage(1);
             }}
           >
@@ -123,7 +112,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value);
-                setScannedBarcode("");
                 setPage(1);
               }}
             >
@@ -135,24 +123,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             </select>
           )}
         </div>
-        {scannedBarcode && (
-          <div className="barcode-lookup" role="status">
-            <span>
-              Exact barcode / serial: <strong>{scannedBarcode}</strong> ·
-              Searching all items
-            </span>
-            <Button
-              variant="quiet"
-              onClick={() => {
-                setScannedBarcode("");
-                setSearch("");
-                setPage(1);
-              }}
-            >
-              Clear scan
-            </Button>
-          </div>
-        )}
         <Status {...q} retry={q.reload}>
           {q.data?.data.length ? (
             <div className="table-scroll">
@@ -255,19 +225,11 @@ export function Catalogue({ low = false }: { low?: boolean }) {
             </div>
           ) : (
             <Empty
-              title={
-                scannedBarcode
-                  ? "Barcode not assigned"
-                  : search
-                    ? "No matching items"
-                    : "No items to display"
-              }
+              title={search ? "No matching items" : "No items to display"}
               text={
-                scannedBarcode
-                  ? `No item has barcode ${scannedBarcode}. ${user.role === "admin" ? "Add an item or edit an existing item to assign it." : "Ask an administrator to assign it to an item."}`
-                  : low
-                    ? "Items will appear when they reach the configured minimum."
-                    : "Add an item, map compatible models, then record its first receipt."
+                low
+                  ? "Items will appear when they reach the configured minimum."
+                  : "Add an item, map compatible models, then record its first receipt."
               }
             />
           )}
@@ -286,18 +248,6 @@ export function Catalogue({ low = false }: { low?: boolean }) {
         />
       )}
       {labels && <ItemLabels item={labels} close={() => setLabels(null)} />}
-      {scanning && (
-        <BarcodeScanner
-          lookup
-          close={() => setScanning(false)}
-          onConfirm={(value) => {
-            setScannedBarcode(value);
-            setSearch(value);
-            setPage(1);
-            setScanning(false);
-          }}
-        />
-      )}
       {edit && (
         <ItemForm
           item={edit === "new" ? undefined : edit}
