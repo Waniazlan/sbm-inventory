@@ -6,6 +6,7 @@ import {
   Layers,
   Package,
   Plus,
+  ScanBarcode,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   Status,
 } from "../components/shared";
 import { StockForm } from "../components/StockForm";
+import { QuickItemLookup } from "../components/QuickItemLookup";
 import { useApp, useLoad } from "../hooks";
 export function Overview() {
   const { user } = useApp();
@@ -33,18 +35,24 @@ export function Overview() {
     low_items: Item[];
   }>("/dashboard");
   const [action, setAction] = useState("");
+  const [quickScan, setQuickScan] = useState(false);
   return (
     <>
       <Heading
         title="Stock overview"
         subtitle="A clear picture of your parts, stock and daily movements."
         actions={
-          user.role === "admin" && (
-            <Button onClick={() => setAction("receipt")}>
-              <Plus size={17} />
-              Receive stock
+          <>
+            {user.role === "admin" && (
+              <Button onClick={() => setAction("receipt")}>
+                <Plus size={17} />
+                Receive stock
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => setQuickScan(true)}>
+              <ScanBarcode size={17} /> Quick scan
             </Button>
-          )
+          </>
         }
       />
       <Status {...q} retry={q.reload}>
@@ -159,6 +167,7 @@ export function Overview() {
       {action && (
         <StockForm kind={action} close={() => setAction("")} done={q.reload} />
       )}
+      {quickScan && <QuickItemLookup close={() => setQuickScan(false)} />}
     </>
   );
 }

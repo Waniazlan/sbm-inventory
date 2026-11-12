@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CatalogueController;
 use App\Http\Controllers\IntegrationController;
+use App\Http\Controllers\ItemLookupController;
 use App\Http\Controllers\LabelSettingsController;
 use App\Http\Controllers\LoginBackgroundController;
 use App\Http\Controllers\RepairUsageReversalController;
@@ -25,6 +26,7 @@ Route::prefix('v1')->group(function () {
         Route::get('metadata', [CatalogueController::class, 'metadata']);
         Route::get('items', [CatalogueController::class, 'index']);
         Route::get('items/options', [CatalogueController::class, 'options']);
+        Route::get('items/lookup', ItemLookupController::class);
         Route::get('items/{item}', [CatalogueController::class, 'show'])->whereNumber('item');
         Route::get('items/{item}/units', [CatalogueController::class, 'units'])->whereNumber('item');
         Route::get('movements', [StockController::class, 'index']);

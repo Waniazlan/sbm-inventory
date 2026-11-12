@@ -41,6 +41,8 @@ Open **Supplier returns → Add supplier return** and scan the item barcode or i
 
 ## Barcode flow
 
+Use **Overview → Quick scan**, beside **Receive stock**, for a brief item check with a wireless/USB barcode reader. The popup focuses its barcode field automatically. Scan a label: the item is found automatically after a 300 ms pause in typing, without a button click or Enter suffix. Scanners that send Enter trigger the lookup immediately. Typed or pasted codes work too. The result shows item details and the individual unit's current status, including Sold, In stock, Returned to stock, Used for repair, and supplier returns, with the latest reference and date when recorded. The field clears and remains focused for the next scan. Close with **X** or Escape. Shared product barcodes show aggregate availability; an individual serial label is needed to establish whether that exact physical unit was sold. Lookup only reads inventory records and reflects sales/returns already posted to Inventory.
+
 1. Open **Item catalogue → Add item** (or **Edit** an existing item).
 2. Select **Scan barcode**, allow camera access, frame the entire barcode, and hold steady. The camera automatically detects supported linear barcodes and QR codes, captures the encoded value, and stops for review. Aim at one label at a time. Select **Scan again** to restart.
 3. Review the decoded value and select **Use barcode**. Complete the item details and **Save item**.

@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Printer } from "lucide-react";
 import { errorText, type Item, type ItemUnit, type Page } from "../api";
 import { useLoad } from "../hooks";
 import { labelSymbol, type LabelSymbol } from "../lib/labels";
+import { fitLabelName } from "../lib/fit-label-name";
 import "./item-labels.css";
 import stickerStyles from "./item-labels.css?inline";
 import { Button, Empty, ErrorBox, Field, Modal, Pager, Status } from "./shared";
@@ -21,6 +22,7 @@ function StickerPreview({
 }) {
   const [symbol, setSymbol] = useState<LabelSymbol | null>(null);
   const [error, setError] = useState("");
+  const label = useRef<HTMLElement>(null);
   const brand = sticker.serial ? sticker.brand?.trim() : undefined;
   const symbolHeight = Math.min(32, height - (sticker.serial ? 21 : 18));
   // Leave more room beside landscape QR codes for the complete serial.
@@ -28,6 +30,9 @@ function StickerPreview({
   const qrSize = Math.min(28, height - 8, width - 27);
   const sideBySide = width >= height * 1.5 && qrSize > symbolHeight;
   const qrLayout = sideBySide && symbol?.format === "QRCode";
+  useLayoutEffect(() => {
+    if (label.current && symbol) fitLabelName(label.current);
+  }, [symbol, item.name, item.sku, brand, qrLayout]);
   useEffect(() => {
     let live = true;
     setSymbol(null);
@@ -49,6 +54,7 @@ function StickerPreview({
   }, [sticker.value, width, symbolHeight, sideBySide, qrSize]);
   return (
     <article
+      ref={label}
       className={`barcode-sticker${qrLayout ? " barcode-sticker-qr" : ""}${brand ? " barcode-sticker-branded" : ""}`}
       data-ready={!!symbol}
       style={
@@ -57,7 +63,7 @@ function StickerPreview({
           : undefined
       }
     >
-      <strong>{item.name}</strong>
+      <strong className="label-name">{item.name}</strong>
       {brand && <span className="label-brand">{brand}</span>}
       <span className="label-sku">{item.sku}</span>
       <div
@@ -172,8 +178,15 @@ export function ItemLabels({ item, close }: { item: Item; close: () => void }) {
     for (const node of source.children)
       doc.body.append(doc.importNode(node, true));
     popup.opener = null;
+    const fitNames = () =>
+      doc
+        .querySelectorAll<HTMLElement>(".barcode-sticker")
+        .forEach(fitLabelName);
+    popup.addEventListener("beforeprint", fitNames);
     try {
       await Promise.all(Array.from(doc.images).map((img) => img.decode()));
+      await doc.fonts.ready;
+      fitNames();
       popup.focus();
       popup.print();
     } catch {

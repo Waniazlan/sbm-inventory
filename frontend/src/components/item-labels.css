@@ -25,10 +25,11 @@
   flex-shrink: 0;
   font-size: 9pt;
   line-height: 1.2;
+  width: 100%;
   max-width: 100%;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .barcode-sticker span {
   flex-shrink: 0;
@@ -74,10 +75,6 @@
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
-}
-.barcode-sticker-qr > strong {
-  white-space: normal;
-  max-height: 2.4em;
 }
 .barcode-sticker-qr > span {
   max-height: 2.4em;

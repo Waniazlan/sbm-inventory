@@ -9,12 +9,13 @@ async function openLabels(
   barcode: string,
   serial?: string,
   brand: string | null = null,
+  name = "Replacement LCD screen",
 ) {
   const item = {
     id: 1,
     sku: "PRN-000001",
     barcode,
-    name: "Replacement LCD screen",
+    name,
     brand: "Legacy product brand",
     category_id: 1,
     category: { id: 1, name: "LCD" },
@@ -259,12 +260,10 @@ for (const size of ["50x30", "30x30"]) {
     const [width, height] = size.split("x").map(Number);
     await expectPdfSize(popup, width, height, 1);
     expect(await decodePrintedLabel(page, popup)).toBe(serial);
-    await popup
-      .locator(".barcode-sticker")
-      .screenshot({
-        path: test.info().outputPath("serial-brand.png"),
-        scale: "device",
-      });
+    await popup.locator(".barcode-sticker").screenshot({
+      path: test.info().outputPath("serial-brand.png"),
+      scale: "device",
+    });
   });
 }
 
@@ -302,3 +301,79 @@ test("custom stock uses the measured width and feed length without rotation", as
   await expectPdfSize(popup, 50.5, 30.5, 1);
   expect(await decodePrintedLabel(page, popup)).toBe(barcode);
 });
+
+for (const scenario of [
+  {
+    size: "50x30",
+    name: "Replacement LCD screen for iPhone 16 Pro Max premium OLED display assembly with touch digitizer and frame "
+      .repeat(2)
+      .slice(0, 200),
+    serial: true,
+  },
+  { size: "30x30", name: "W".repeat(200), serial: true },
+  {
+    size: "35x35",
+    name: "原装手机屏幕总成液晶触摸显示屏配件".repeat(10),
+    serial: true,
+  },
+  {
+    size: "50x30",
+    name: "Replacement LCD screen with touch digitizer and frame for multiple compatible phone models",
+    serial: false,
+  },
+]) {
+  test(`complete long ${scenario.serial ? "serial" : "product"} label name fits on ${scenario.size} stock`, async ({
+    page,
+    context,
+  }) => {
+    const serial = scenario.serial ? "SN-0000000001-12050-99" : undefined;
+    const barcode = scenario.serial ? "SBM-P-00000001" : "123456";
+    const dialog = await openLabels(
+      page,
+      barcode,
+      serial,
+      "Original LCD",
+      scenario.name,
+    );
+    await dialog.getByLabel("Sticker size").selectOption(scenario.size);
+    if (serial)
+      await dialog.getByLabel(`Print ${serial}`, { exact: true }).check();
+    const popup = await printLabels(page, context, 1);
+    for (const document of [dialog, popup]) {
+      const name = document.locator(".label-name");
+      await expect(name).toHaveText(scenario.name);
+      const bounds = await name.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const label = element.parentElement!.getBoundingClientRect();
+        return {
+          scrollHeight: element.scrollHeight,
+          clientHeight: element.clientHeight,
+          scrollWidth: element.scrollWidth,
+          clientWidth: element.clientWidth,
+          contained:
+            rect.left >= label.left &&
+            rect.right <= label.right &&
+            rect.top >= label.top &&
+            rect.bottom <= label.bottom,
+          fontSize: getComputedStyle(element).fontSize,
+        };
+      });
+      expect(bounds.scrollHeight, JSON.stringify(bounds)).toBeLessThanOrEqual(
+        bounds.clientHeight,
+      );
+      expect(bounds.scrollWidth, JSON.stringify(bounds)).toBeLessThanOrEqual(
+        bounds.clientWidth,
+      );
+      expect(bounds.contained, JSON.stringify(bounds)).toBe(true);
+    }
+    const [width, height] = scenario.size.split("x").map(Number);
+    await expectPdfSize(popup, width, height, 1);
+    expect(await decodePrintedLabel(page, popup)).toBe(serial || barcode);
+    await popup
+      .locator(".barcode-sticker")
+      .screenshot({
+        path: test.info().outputPath("long-name.png"),
+        scale: "device",
+      });
+  });
+}
