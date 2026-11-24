@@ -41,6 +41,7 @@ class SsoController
             abort_unless($status->successful() && $central->matches($status->json(), $subject), 403);
             $link = AccountLink::where('issuer', config('sbm-sso.issuer'))->where('subject', $subject)
                 ->where('application_id', config('sbm-sso.application_id'))->first();
+            $link ??= $central->autoLink($subject, (array) $identity->user);
             $user = $link ? $central->localUser($link) : null;
             abort_unless($user, 403);
             $request->attributes->set('sbm_sso_login', true);

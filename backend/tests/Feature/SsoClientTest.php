@@ -337,6 +337,61 @@ class SsoClientTest extends TestCase
         $central->assertSafeUrl('http://127.0.0.1:8000');
     }
 
+    private function autoLinkConfig(): void
+    {
+        config(['sbm-sso.auto_link' => true, 'sbm-sso.allow_staff' => true]);
+    }
+
+    private function signInWithClaims(array $claims): void
+    {
+        $this->identityProvider(1, $claims);
+        $this->validProbe();
+        $this->withSession($this->pending())->get('/auth/sso/callback?code=test-code&state=test-state');
+    }
+
+    public function test_verified_email_links_a_single_active_staff_account_on_first_sign_in(): void
+    {
+        $this->autoLinkConfig();
+        $staff = $this->createUser(['email' => 'Staff@Example.test', 'role' => 'cashier']);
+        $this->signInWithClaims(['email' => 'staff@example.test', 'email_verified' => true]);
+        $this->assertAuthenticatedAs($staff, 'web');
+        $this->assertDatabaseHas('sso_account_links', ['subject' => self::SUBJECT, 'user_id' => $staff->id, 'application_id' => 17]);
+    }
+
+    public function test_unverified_or_missing_email_claim_never_auto_links(): void
+    {
+        $this->autoLinkConfig();
+        $this->createUser(['email' => 'staff@example.test', 'role' => 'cashier']);
+        foreach ([['email' => 'staff@example.test', 'email_verified' => false], ['email' => 'staff@example.test'], ['email_verified' => true], ['email' => 'staff@example.test', 'email_verified' => 'true']] as $claims) {
+            $this->signInWithClaims($claims);
+            $this->assertGuest('web');
+        }
+        $this->assertDatabaseCount('sso_account_links', 0);
+    }
+
+    public function test_auto_link_is_off_by_default_and_needs_staff_access_enabled(): void
+    {
+        $this->createUser(['email' => 'staff@example.test', 'role' => 'cashier']);
+        $this->signInWithClaims(['email' => 'staff@example.test', 'email_verified' => true]);
+        config(['sbm-sso.auto_link' => true]);
+        $this->signInWithClaims(['email' => 'staff@example.test', 'email_verified' => true]);
+        $this->assertGuest('web');
+        $this->assertDatabaseCount('sso_account_links', 0);
+    }
+
+    public function test_auto_link_refuses_inactive_duplicate_or_already_linked_accounts(): void
+    {
+        $this->autoLinkConfig();
+        $inactive = $this->createUser(['email' => 'inactive@example.test', 'role' => 'cashier', 'active' => false]);
+        $this->signInWithClaims(['email' => $inactive->email, 'email_verified' => true]);
+        $this->assertGuest('web');
+        // The seeded administrator is already linked to a different portal identity.
+        AccountLink::create(['issuer' => self::ISSUER, 'subject' => 'someone-else', 'application_id' => 17, 'branch_id' => 29, 'user_id' => $this->admin->id, 'local_shop_id' => $this->shopId]);
+        $this->signInWithClaims(['email' => $this->admin->email, 'email_verified' => true]);
+        $this->assertGuest('web');
+        $this->assertDatabaseMissing('sso_account_links', ['subject' => self::SUBJECT]);
+    }
+
     private function createUser(array $attributes = []): User
     {
         return User::forceCreate([
@@ -362,9 +417,9 @@ class SsoClientTest extends TestCase
         ];
     }
 
-    private function identityProvider(int $calls = 1): void
+    private function identityProvider(int $calls = 1, array $claims = []): void
     {
-        $identity = (new Identity)->map(['id' => self::SUBJECT, 'email' => $this->admin->email])->setToken(self::TOKEN);
+        $identity = (new Identity)->map(['id' => self::SUBJECT, 'email' => $this->admin->email])->setRaw($claims)->setToken(self::TOKEN);
         $provider = Mockery::mock(Provider::class);
         $provider->shouldReceive('user')->times($calls)->andReturn($identity);
         $central = Mockery::mock(CentralSession::class)->makePartial();

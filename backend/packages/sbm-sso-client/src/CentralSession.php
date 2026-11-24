@@ -62,7 +62,7 @@ class CentralSession
             return null;
         }
         $user = config('sbm-sso.user_model')::find($link->user_id);
-        if (! $user || ! $user->active || $user->role !== 'admin') {
+        if (! $user || ! $user->active || (! config('sbm-sso.allow_staff') && $user->role !== 'admin')) {
             return null;
         }
         // Tracking must configure a shop explicitly; IDs in different applications are unrelated.
@@ -76,6 +76,34 @@ class CentralSession
         }
 
         return $user;
+    }
+
+    /** Create a first-time link from a verified portal email; null whenever any safety condition is unmet. */
+    public function autoLink(string $subject, array $claims): ?AccountLink
+    {
+        $email = $claims['email'] ?? null;
+        if (! config('sbm-sso.auto_link') || ! config('sbm-sso.allow_staff') || ($claims['email_verified'] ?? false) !== true
+            || ! is_string($email) || $email === '' || strlen($email) > 255) {
+            return null;
+        }
+        $matches = config('sbm-sso.user_model')::whereRaw('lower(email) = ?', [mb_strtolower($email)])->limit(2)->get();
+        if ($matches->count() !== 1) {
+            return null;
+        }
+        $user = $matches->first();
+        $identity = ['issuer' => config('sbm-sso.issuer'), 'application_id' => config('sbm-sso.application_id')];
+        // A local account already tied to a different portal identity must be re-linked explicitly.
+        if (AccountLink::where($identity)->where('user_id', $user->getKey())->exists()) {
+            return null;
+        }
+        $link = new AccountLink([...$identity, 'subject' => $subject, 'branch_id' => config('sbm-sso.branch_id'), 'user_id' => (int) $user->getKey(),
+            'local_shop_id' => $user->getAttribute('shop_id') !== null ? (config('sbm-sso.local_shop_id') ? (int) config('sbm-sso.local_shop_id') : null) : null]);
+        if (! $this->localUser($link)) {
+            return null;
+        }
+        $link->save();
+
+        return $link;
     }
 
     public function assertSafeUrl(string $url): void
